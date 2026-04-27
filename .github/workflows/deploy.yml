@@ -25,9 +25,15 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/frontend/package-lock.json
 
-      - name: Install dependencies
+      - name: Install Worker dependencies
         run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm --prefix src/frontend ci
 
       - name: Build
         run: npm run build
