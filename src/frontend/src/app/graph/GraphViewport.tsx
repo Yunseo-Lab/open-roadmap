@@ -65,6 +65,7 @@ export function GraphViewport({
       elementsSelectable={elementsSelectable}
       panOnDrag={panOnDrag}
       zoomOnScroll={zoomOnScroll}
+      proOptions={{ hideAttribution: true }}
     >
       <Background />
       <Controls showInteractive={controlsInteractive} />
