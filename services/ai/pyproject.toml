@@ -1,0 +1,19 @@
+[project]
+name = "loadmap-ai-service"
+version = "0.1.0"
+description = "Python AI service boundary for Loadmap roadmap generation."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic>=2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.6.0",
+  "pytest>=8.0.0",
+]
+
+[tool.ruff]
+line-length = 100

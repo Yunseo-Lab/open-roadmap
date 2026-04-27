@@ -1,0 +1,38 @@
+{
+  "name": "loadmap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787 --local",
+    "build:frontend": "npm --prefix src/frontend run build -- --outDir ../../dist/client --emptyOutDir",
+    "build": "npm run build:frontend && tsc -p tsconfig.worker.json --noEmit",
+    "preview": "npm run build:frontend && wrangler dev --port 8787 --local",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply loadmap-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply loadmap-db --remote"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "latest",
+    "@xyflow/react": "latest",
+    "better-auth": "latest",
+    "drizzle-orm": "latest",
+    "hono": "latest",
+    "lucide-react": "latest",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "@types/node": "^25.6.0",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "latest",
+    "drizzle-kit": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest",
+    "wrangler": "latest"
+  }
+}
