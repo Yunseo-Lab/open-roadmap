@@ -6,6 +6,7 @@ import { DashboardPage } from './components/DashboardPage';
 import { Workspace } from './components/Workspace';
 import { PublicProfile } from './components/PublicProfile';
 import { PublicRoadmap } from './components/PublicRoadmap';
+import { SettingsPage } from './components/SettingsPage';
 
 export default function App() {
   return (
@@ -30,6 +31,14 @@ export default function App() {
             element={
               <RequireAuth loadingBody="Preparing your workspace.">
                 <Workspace />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RequireAuth loadingBody="Loading settings.">
+                <SettingsPage />
               </RequireAuth>
             }
           />

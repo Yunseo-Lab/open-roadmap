@@ -17,6 +17,7 @@ interface AuthContextValue {
   error: string | null;
   signIn: () => void;
   signOut: () => void;
+  applyProfileUpdate: (profile: CurrentUser["profile"]) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -51,6 +52,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void authClient.signOut().finally(() => setUser(null));
   }, []);
 
+  const applyProfileUpdate = useCallback((profile: CurrentUser["profile"]) => {
+    setUser((currentUser) => {
+      if (!currentUser) {
+        return currentUser;
+      }
+
+      return {
+        ...currentUser,
+        profile,
+      };
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -58,8 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       signIn,
       signOut,
+      applyProfileUpdate,
     }),
-    [error, loading, signIn, signOut, user],
+    [applyProfileUpdate, error, loading, signIn, signOut, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

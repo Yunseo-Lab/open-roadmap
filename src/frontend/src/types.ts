@@ -4,6 +4,8 @@ export type UserProfile = {
   bio: string;
 };
 
+export type UpdateProfileInput = UserProfile;
+
 export type CurrentUser = {
   id: string;
   name: string;

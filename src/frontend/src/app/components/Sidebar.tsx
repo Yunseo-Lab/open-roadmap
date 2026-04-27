@@ -9,6 +9,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   onCreateRoadmap?: () => void;
   onGoToDashboard?: () => void;
+  onGoToSettings?: () => void;
   onRequestDeleteRoadmap?: (roadmap: Roadmap) => void;
 }
 
@@ -20,6 +21,7 @@ export function Sidebar({
   onToggleCollapse,
   onCreateRoadmap,
   onGoToDashboard,
+  onGoToSettings,
   onRequestDeleteRoadmap,
 }: SidebarProps) {
   const currentRoadmap = roadmaps.find((roadmap) => roadmap.id === selectedRoadmap) ?? null;
@@ -123,7 +125,11 @@ export function Sidebar({
             <span>Delete this Roadmap</span>
           </button>
         ) : null}
-        <button className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent rounded-lg text-sm">
+        <button
+          type="button"
+          onClick={onGoToSettings}
+          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent rounded-lg text-sm"
+        >
           <Settings className="w-4 h-4" />
           <span>Settings</span>
         </button>

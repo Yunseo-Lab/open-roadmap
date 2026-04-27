@@ -8,7 +8,9 @@ import type {
   RoadmapGraph,
   SaveRoadmapGraphInput,
   UpdateArtifactInput,
+  UpdateProfileInput,
   UpdateRoadmapInput,
+  UserProfile,
 } from "../types";
 
 type ApiResponse<T> = T & {
@@ -46,6 +48,11 @@ export async function apiRequest<T>(
 
 export const api = {
   me: () => apiRequest<{ user: CurrentUser }>("/api/me"),
+  updateProfile: (body: UpdateProfileInput) =>
+    apiRequest<{ profile: UserProfile }>("/api/profile", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   listRoadmaps: () => apiRequest<{ roadmaps: Roadmap[] }>("/api/roadmaps"),
   createRoadmap: (body: CreateRoadmapInput) =>
     apiRequest<{ roadmap: Roadmap | null }>("/api/roadmaps", {

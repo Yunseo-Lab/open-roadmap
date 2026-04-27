@@ -164,6 +164,7 @@ export function Workspace() {
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onCreateRoadmap={() => navigate('/dashboard')}
           onGoToDashboard={() => navigate('/dashboard')}
+          onGoToSettings={() => navigate('/settings')}
           onRequestDeleteRoadmap={openDeleteRoadmapDialog}
         />
       </div>
