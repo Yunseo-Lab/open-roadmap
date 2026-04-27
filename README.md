@@ -1,4 +1,4 @@
-# Loadmap
+# Open Roadmap
 
 AI와 함께 로드맵을 만들고, 목표와 이벤트의 증거를 공개 포트폴리오로 발행하는 Cloudflare Workers 기반 v1입니다.
 

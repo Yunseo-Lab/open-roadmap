@@ -61,7 +61,7 @@ export function PublicRoadmap() {
   }, [slug]);
 
   if (loading) {
-    return <FullScreenMessage title="Loadmap" body="Loading public roadmap." />;
+    return <FullScreenMessage title="Open Roadmap" body="Loading public roadmap." />;
   }
 
   if (error || !roadmap) {
@@ -85,7 +85,7 @@ export function PublicRoadmap() {
             ) : (
               <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowLeft className="w-4 h-4" />
-                Back to Loadmap
+                Back to Open Roadmap
               </Link>
             )}
             <button

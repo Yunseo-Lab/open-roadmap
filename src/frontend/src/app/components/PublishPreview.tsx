@@ -43,7 +43,7 @@ export function PublishPreview({
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
               <span>Preview</span>
               <span>•</span>
-              <span className="text-foreground">loadmap.io/r/{slug}</span>
+              <span className="text-foreground">open-roadmap.io/r/{slug}</span>
             </div>
             <h2 className="text-xl">{title || 'Untitled Roadmap'}</h2>
             {summary && (

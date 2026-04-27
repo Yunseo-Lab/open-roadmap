@@ -7,7 +7,7 @@ export function LoginRoute() {
   const { error, loading, signIn, user } = useAuth();
 
   if (loading) {
-    return <FullScreenMessage title="Loadmap" body="Checking your account." />;
+    return <FullScreenMessage title="Open Roadmap" body="Checking your account." />;
   }
 
   if (user) {

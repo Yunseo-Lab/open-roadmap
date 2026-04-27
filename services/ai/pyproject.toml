@@ -1,7 +1,7 @@
 [project]
-name = "loadmap-ai-service"
+name = "open-roadmap-ai-service"
 version = "0.1.0"
-description = "Python AI service boundary for Loadmap roadmap generation."
+description = "Python AI service boundary for Open Roadmap roadmap generation."
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",

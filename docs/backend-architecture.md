@@ -1,10 +1,10 @@
-# Loadmap Backend Architecture
+# Open Roadmap Backend Architecture
 
-이 문서는 Loadmap 백엔드의 현재 구조, 런타임 구성, API 계약, 데이터 모델, AI Agent 흐름을 설명한다. 기준 코드는 `src/backend`, `src/shared`, `migrations`, `wrangler.jsonc`이다.
+이 문서는 Open Roadmap 백엔드의 현재 구조, 런타임 구성, API 계약, 데이터 모델, AI Agent 흐름을 설명한다. 기준 코드는 `src/backend`, `src/shared`, `migrations`, `wrangler.jsonc`이다.
 
 ## 요약
 
-Loadmap 백엔드는 Cloudflare Workers 위에서 실행되는 Hono 애플리케이션이다. Worker는 API 요청을 직접 처리하고, 프론트엔드 정적 에셋은 Wrangler Assets binding을 통해 제공한다.
+Open Roadmap 백엔드는 Cloudflare Workers 위에서 실행되는 Hono 애플리케이션이다. Worker는 API 요청을 직접 처리하고, 프론트엔드 정적 에셋은 Wrangler Assets binding을 통해 제공한다.
 
 핵심 책임은 다음과 같다.
 
@@ -22,8 +22,8 @@ flowchart LR
   Browser["Browser / React App"]
   Worker["Cloudflare Worker\nHono app"]
   Assets["Workers Assets\n./dist/client"]
-  D1["Cloudflare D1\nloadmap-db"]
-  R2["Cloudflare R2\nloadmap-files"]
+  D1["Cloudflare D1\nopen-roadmap-db"]
+  R2["Cloudflare R2\nopen-roadmap-files"]
   BetterAuth["Better Auth\n/api/auth/*"]
   OpenRouter["OpenRouter API"]
   PythonAI["Python AI Service\n/roadmap-agent/runs"]
@@ -383,7 +383,7 @@ Response:
   "user": {
     "id": "dev-user",
     "name": "Local Developer",
-    "email": "dev@loadmap.local",
+    "email": "dev@open-roadmap.local",
     "image": null,
     "profile": {
       "handle": "local-developer",

@@ -191,7 +191,7 @@ export function Inspector({ selectedNode, view, onViewChange, onNodeUpdate, isCo
             <div>
               <label className="text-sm block mb-2">URL Slug</label>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">loadmap.io/r/</span>
+                <span className="text-xs text-muted-foreground">open-roadmap.io/r/</span>
                 <input
                   type="text"
                   value={publishSlug}

@@ -24,10 +24,10 @@ export function createAuth(env: AppEnv) {
   const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
   const secret =
     env.BETTER_AUTH_SECRET ??
-    (env.APP_ENV === "production" ? "" : "development-only-loadmap-secret-change-me");
+    (env.APP_ENV === "production" ? "" : "development-only-open-roadmap-secret-change-me");
 
   return betterAuth({
-    appName: "Loadmap",
+    appName: "Open Roadmap",
     baseURL: env.BETTER_AUTH_URL,
     secret,
     database: drizzleAdapter(drizzle(env.DB, { schema: authSchema }), {
@@ -107,13 +107,13 @@ async function ensureDevUser(db: D1Database): Promise<CurrentUser> {
       `INSERT OR IGNORE INTO users (id, name, email, email_verified, image, created_at, updated_at)
        VALUES (?, ?, ?, 1, NULL, ?, ?)`,
     )
-    .bind("dev-user", "Local Developer", "dev@loadmap.local", now, now)
+    .bind("dev-user", "Local Developer", "dev@open-roadmap.local", now, now)
     .run();
 
   return ensureUserProfile(db, {
     id: "dev-user",
     name: "Local Developer",
-    email: "dev@loadmap.local",
+    email: "dev@open-roadmap.local",
     image: null,
   });
 }

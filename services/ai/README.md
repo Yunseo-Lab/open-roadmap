@@ -1,4 +1,4 @@
-# Loadmap AI Service
+# Open Roadmap AI Service
 
 This is the Python boundary for roadmap generation. The Cloudflare Worker calls this service when `AI_SERVICE_URL` is set.
 

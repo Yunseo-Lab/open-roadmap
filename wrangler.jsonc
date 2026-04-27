@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "loadmap",
+  "name": "open-roadmap",
   "main": "src/backend/index.ts",
   "compatibility_date": "2026-04-25",
   "compatibility_flags": ["nodejs_compat"],
@@ -13,19 +13,19 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "loadmap-db",
-      "database_id": "5d347a34-44b8-470f-8f5e-470bea259503"
+      "database_name": "open-roadmap-db",
+      "database_id": "f799cb64-e2f6-465c-9257-d30cf40a2edd"
     }
   ],
   "r2_buckets": [
     {
       "binding": "FILES",
-      "bucket_name": "loadmap-files"
+      "bucket_name": "open-roadmap-files"
     }
   ],
   "vars": {
     "APP_ENV": "development",
-    "BETTER_AUTH_URL": "https://loadmap.yunseo-tech.workers.dev",
+    "BETTER_AUTH_URL": "https://open-roadmap.yunseo-tech.workers.dev",
     "OPENROUTER_MODEL": "openai/gpt-4.1-mini",
     "AI_SERVICE_URL": ""
   },

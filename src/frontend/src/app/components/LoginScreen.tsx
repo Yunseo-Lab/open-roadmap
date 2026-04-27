@@ -14,7 +14,7 @@ export function LoginScreen({ onLogin, error }: LoginScreenProps) {
             <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center">
               <Target className="w-6 h-6 text-background" />
             </div>
-            <h1 className="text-3xl">Loadmap</h1>
+            <h1 className="text-3xl">Open Roadmap</h1>
           </div>
           <p className="text-muted-foreground max-w-sm mx-auto">
             AI-powered goal management and portfolio builder. Visualize your roadmap, track progress, share achievements.

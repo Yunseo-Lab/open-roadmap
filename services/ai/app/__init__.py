@@ -1,1 +1,1 @@
-"""Loadmap AI service."""
+"""Open Roadmap AI service."""

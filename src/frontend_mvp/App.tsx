@@ -79,7 +79,7 @@ function WorkspaceApp() {
   }, []);
 
   if (loading) {
-    return <FullScreenMessage title="Loadmap" body="Preparing your workspace." />;
+    return <FullScreenMessage title="Open Roadmap" body="Preparing your workspace." />;
   }
 
   if (!user) {
@@ -97,8 +97,8 @@ function LoginScreen({ error }: { error: string | null }) {
   return (
     <main className="login">
       <section className="login-panel">
-        <div className="brand-mark">L</div>
-        <h1>Loadmap</h1>
+        <div className="brand-mark">O</div>
+        <h1>Open Roadmap</h1>
         <p>Build goal roadmaps with AI and publish your real progress as a portfolio.</p>
         {error ? <p className="error-text">{error}</p> : null}
         <button
@@ -320,8 +320,8 @@ function Dashboard({ user, onUserChange }: { user: CurrentUser; onUserChange: (u
         <div className="sidebar-header">
           <div>
             <div className="brand-row">
-              <span className="brand-mark small">L</span>
-              <strong>Loadmap</strong>
+              <span className="brand-mark small">O</span>
+              <strong>Open Roadmap</strong>
             </div>
             <span className="muted">{user.profile.displayName}</span>
           </div>
@@ -995,13 +995,13 @@ function PublicProfilePage({ handle }: { handle: string }) {
     return <FullScreenMessage title="Profile not found" body={error} />;
   }
   if (!data) {
-    return <FullScreenMessage title="Loadmap" body="Loading public profile." />;
+    return <FullScreenMessage title="Open Roadmap" body="Loading public profile." />;
   }
 
   return (
     <main className="public-page">
       <header className="public-header">
-        <span className="brand-mark small">L</span>
+        <span className="brand-mark small">O</span>
         <div>
           <h1>{data.profile.displayName}</h1>
           <p>{data.profile.bio || "Published roadmap portfolio"}</p>
@@ -1039,13 +1039,13 @@ function PublicRoadmapPage({ slug }: { slug: string }) {
     return <FullScreenMessage title="Roadmap not found" body={error} />;
   }
   if (!data) {
-    return <FullScreenMessage title="Loadmap" body="Loading public roadmap." />;
+    return <FullScreenMessage title="Open Roadmap" body="Loading public roadmap." />;
   }
 
   return (
     <main className="public-roadmap-page">
       <header className="public-roadmap-header">
-        <a href={data.profile ? `/u/${data.profile.handle}` : "/"}>{data.profile?.displayName ?? "Loadmap"}</a>
+        <a href={data.profile ? `/u/${data.profile.handle}` : "/"}>{data.profile?.displayName ?? "Open Roadmap"}</a>
         <h1>{data.roadmap.publicTitle ?? data.roadmap.title}</h1>
         <p>{data.roadmap.publicSummary ?? data.roadmap.summary}</p>
       </header>
@@ -1086,7 +1086,7 @@ function EmptyPanel() {
 function FullScreenMessage({ title, body }: { title: string; body: string }) {
   return (
     <main className="center-screen">
-      <div className="brand-mark">L</div>
+      <div className="brand-mark">O</div>
       <h1>{title}</h1>
       <p>{body}</p>
     </main>

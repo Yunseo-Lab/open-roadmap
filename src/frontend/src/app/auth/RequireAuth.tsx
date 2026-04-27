@@ -12,7 +12,7 @@ export function RequireAuth({ children, loadingBody }: RequireAuthProps) {
   const { loading, user } = useAuth();
 
   if (loading) {
-    return <FullScreenMessage title="Loadmap" body={loadingBody} />;
+    return <FullScreenMessage title="Open Roadmap" body={loadingBody} />;
   }
 
   if (!user) {

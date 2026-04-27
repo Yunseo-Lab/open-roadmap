@@ -135,7 +135,7 @@ export function Workspace() {
   }
 
   if (graph.loading) {
-    return <FullScreenMessage title="Loadmap" body="Loading roadmap graph." />;
+    return <FullScreenMessage title="Open Roadmap" body="Loading roadmap graph." />;
   }
 
   if (graph.loadError || !graph.roadmap) {

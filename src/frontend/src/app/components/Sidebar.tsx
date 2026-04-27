@@ -49,7 +49,7 @@ export function Sidebar({
             <div className="w-8 h-8 rounded bg-foreground flex items-center justify-center">
               <Target className="w-5 h-5 text-background" />
             </div>
-            <span className="font-medium">Loadmap</span>
+            <span className="font-medium">Open Roadmap</span>
           </div>
           <ChevronLeft className="w-4 h-4 text-muted-foreground" />
         </div>

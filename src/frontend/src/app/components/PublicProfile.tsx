@@ -51,7 +51,7 @@ export function PublicProfile() {
   }, [handle]);
 
   if (loading) {
-    return <FullScreenMessage title="Loadmap" body="Loading public profile." />;
+    return <FullScreenMessage title="Open Roadmap" body="Loading public profile." />;
   }
 
   if (error || !profile) {

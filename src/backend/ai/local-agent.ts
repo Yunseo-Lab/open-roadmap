@@ -117,7 +117,7 @@ async function callOpenRouterAgent(
     {
       role: "system",
       content:
-        "You are Loadmap's roadmap graph generation agent. Build goal-oriented graphs from the user's documents and conversation. " +
+        "You are Open Roadmap's roadmap graph generation agent. Build goal-oriented graphs from the user's documents and conversation. " +
         "Modify the graph only through the provided tools. Prefer the default types, but create new node or edge types when the user's thinking structure needs them. " +
         `Current node types: ${describeTypes(startingGraph.nodeTypes)}. ` +
         `Current edge types: ${describeTypes(startingGraph.edgeTypes)}. ` +
@@ -136,7 +136,7 @@ async function callOpenRouterAgent(
         Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": env.BETTER_AUTH_URL,
-        "X-Title": "Loadmap",
+        "X-Title": "Open Roadmap",
       },
       body: JSON.stringify({
         model,

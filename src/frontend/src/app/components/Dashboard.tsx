@@ -145,7 +145,7 @@ export function Dashboard({
           <div className="w-6 h-6 rounded bg-foreground flex items-center justify-center">
             <Target className="w-4 h-4 text-background" />
           </div>
-          <span className="text-sm font-medium">Loadmap</span>
+          <span className="text-sm font-medium">Open Roadmap</span>
         </div>
         <AccountButton user={user} onSignOut={onSignOut} />
       </div>

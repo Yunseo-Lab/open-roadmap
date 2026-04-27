@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from .agent import build_graph_response
 from .schemas import RoadmapAgentRequest, RoadmapAgentResponse
 
-app = FastAPI(title="Loadmap AI Service")
+app = FastAPI(title="Open Roadmap AI Service")
 
 
 @app.get("/health")

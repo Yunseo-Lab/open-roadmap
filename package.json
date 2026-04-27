@@ -1,5 +1,5 @@
 {
-  "name": "loadmap",
+  "name": "open-roadmap",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "preview": "npm run build:frontend && wrangler dev --port 8787 --local",
     "test": "vitest run",
     "cf-typegen": "wrangler types",
-    "db:migrate:local": "wrangler d1 migrations apply loadmap-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply loadmap-db --remote"
+    "db:migrate:local": "wrangler d1 migrations apply open-roadmap-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply open-roadmap-db --remote"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "latest",
