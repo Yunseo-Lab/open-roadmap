@@ -1,13 +1,6 @@
 import { useState } from 'react';
 import { X, Share2, ExternalLink } from 'lucide-react';
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import { graphNodeTypes } from '../graph/nodeTypes';
+import { GraphViewport } from '../graph/GraphViewport';
 import type { GraphEdge, GraphNode } from '../graph/types';
 import { ShareRoadmapDialog } from './ShareRoadmapDialog';
 
@@ -90,34 +83,16 @@ export function PublishPreview({
 
         {/* Graph Preview */}
         <div className="flex-1 bg-accent/20 min-h-0">
-          <ReactFlow
+          <GraphViewport
             nodes={nodes}
             edges={edges}
-            nodeTypes={graphNodeTypes}
-            fitView
-            minZoom={0.5}
-            maxZoom={1.5}
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={false}
             panOnDrag={true}
             zoomOnScroll={true}
-          >
-            <Background />
-            <Controls showInteractive={false} />
-            <MiniMap
-              nodeColor={(node) => {
-                switch (node.type) {
-                  case 'objective': return '#3b82f6';
-                  case 'milestone': return '#8b5cf6';
-                  case 'event': return '#ec4899';
-                  case 'artifact': return '#10b981';
-                  default: return '#94a3b8';
-                }
-              }}
-              maskColor="rgba(0, 0, 0, 0.1)"
-            />
-          </ReactFlow>
+            controlsInteractive={false}
+          />
         </div>
 
         {/* Footer Info */}

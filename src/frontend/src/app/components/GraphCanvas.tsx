@@ -1,16 +1,10 @@
 import { useCallback } from 'react';
 import {
-  ReactFlow,
-  Background,
-  ConnectionMode,
-  Controls,
-  MiniMap,
   type Connection,
   type EdgeChange,
   type NodeChange,
 } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import { graphNodeTypes } from '../graph/nodeTypes';
+import { GraphViewport } from '../graph/GraphViewport';
 import type { GraphEdge, GraphNode, SelectedElement } from '../graph/types';
 
 interface GraphCanvasProps {
@@ -56,7 +50,7 @@ export function GraphCanvas({
           </div>
         </div>
       ) : null}
-      <ReactFlow
+      <GraphViewport
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -65,27 +59,7 @@ export function GraphCanvas({
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
-        nodeTypes={graphNodeTypes}
-        connectionMode={ConnectionMode.Loose}
-        fitView
-        minZoom={0.5}
-        maxZoom={1.5}
-      >
-        <Background />
-        <Controls />
-        <MiniMap
-          nodeColor={(node) => {
-            switch (node.type) {
-              case 'objective': return '#3b82f6';
-              case 'milestone': return '#8b5cf6';
-              case 'event': return '#ec4899';
-              case 'artifact': return '#10b981';
-              default: return '#94a3b8';
-            }
-          }}
-          maskColor="rgba(0, 0, 0, 0.1)"
-        />
-      </ReactFlow>
+      />
     </div>
   );
 }

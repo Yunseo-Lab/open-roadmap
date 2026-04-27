@@ -1,17 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import {
-  Background,
-  Controls,
-  MiniMap,
-  ReactFlow,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
 import { ArrowLeft, ExternalLink, FileText, Share2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { Artifact, PublicProfile, Roadmap } from '../../types';
 import { toWorkspaceEdge, toWorkspaceNode } from '../graph/adapter';
-import { graphNodeTypes } from '../graph/nodeTypes';
+import { GraphViewport } from '../graph/GraphViewport';
 import type { GraphEdge, GraphNode } from '../graph/types';
 import { FullScreenMessage } from './FullScreenMessage';
 import { ShareRoadmapDialog } from './ShareRoadmapDialog';
@@ -139,32 +132,14 @@ export function PublicRoadmap() {
         </div>
 
         <div className="bg-card border border-border rounded-lg overflow-hidden" style={{ height: '600px' }}>
-          <ReactFlow
+          <GraphViewport
             nodes={nodes}
             edges={edges}
-            nodeTypes={graphNodeTypes}
-            fitView
-            minZoom={0.5}
-            maxZoom={1.5}
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable
-          >
-            <Background />
-            <Controls showInteractive={false} />
-            <MiniMap
-              nodeColor={(node) => {
-                switch (node.type) {
-                  case 'objective': return '#3b82f6';
-                  case 'milestone': return '#8b5cf6';
-                  case 'event': return '#ec4899';
-                  case 'artifact': return '#10b981';
-                  default: return '#94a3b8';
-                }
-              }}
-              maskColor="rgba(0, 0, 0, 0.1)"
-            />
-          </ReactFlow>
+            controlsInteractive={false}
+          />
         </div>
 
         {artifacts.length > 0 ? (
