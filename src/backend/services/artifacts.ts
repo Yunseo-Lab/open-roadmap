@@ -2,6 +2,7 @@ import { getArtifactForUser } from "../db/queries";
 import type { AppEnv, ArtifactRow, CurrentUser } from "../types";
 
 const maxUploadSize = 10 * 1024 * 1024;
+type StoredFileArtifact = Pick<ArtifactRow, "id" | "r2_key">;
 const allowedMimeTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -87,11 +88,12 @@ export async function deleteArtifactFilesForRoadmap(
      WHERE roadmap_id = ? AND user_id = ? AND r2_key IS NOT NULL`,
   )
     .bind(roadmapId, userId)
-    .all<Pick<ArtifactRow, "id" | "r2_key">>();
+    .all<StoredFileArtifact>();
 
+  const artifactRows: StoredFileArtifact[] = artifacts.results ?? [];
   await Promise.all(
-    (artifacts.results ?? [])
-      .filter((artifact): artifact is { id: string; r2_key: string } => Boolean(artifact.r2_key))
+    artifactRows
+      .filter((artifact): artifact is StoredFileArtifact & { r2_key: string } => Boolean(artifact.r2_key))
       .map((artifact) => env.FILES.delete(artifact.r2_key)),
   );
 }

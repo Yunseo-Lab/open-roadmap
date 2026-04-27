@@ -14,4 +14,10 @@ type RuntimeVars = {
   AI_SERVICE_URL?: string;
 };
 
-export type AppEnv = Omit<Env, keyof RuntimeVars> & RuntimeVars & AppSecrets;
+type AppBindings = {
+  DB: D1Database;
+  FILES: R2Bucket;
+  ASSETS: Fetcher;
+};
+
+export type AppEnv = AppBindings & RuntimeVars & AppSecrets;
