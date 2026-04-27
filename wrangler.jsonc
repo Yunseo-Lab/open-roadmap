@@ -25,7 +25,7 @@
   ],
   "vars": {
     "APP_ENV": "development",
-    "BETTER_AUTH_URL": "http://localhost:8787",
+    "BETTER_AUTH_URL": "https://loadmap.yunseo-tech.workers.dev",
     "OPENROUTER_MODEL": "openai/gpt-4.1-mini",
     "AI_SERVICE_URL": ""
   },
