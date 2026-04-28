@@ -736,7 +736,7 @@ The backend-facing frontend client should keep a thin API wrapper around `fetch`
 - Parse JSON safely.
 - Throw an `ApiError` with response status and `{ error }` message on non-2xx responses.
 
-The existing MVP client in `src/frontend_mvp/lib/api.ts` already follows this pattern and can be moved into the new frontend.
+The current frontend client in `src/frontend/src/lib/api.ts` follows this pattern and should stay as the single browser API boundary.
 
 ### Graph adapter requirement
 
