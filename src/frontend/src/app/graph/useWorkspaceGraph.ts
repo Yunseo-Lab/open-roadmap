@@ -410,6 +410,7 @@ function updateGraphNode(node: GraphNode, updates: ElementUpdates): GraphNode {
 
   return {
     ...node,
+    type: updates.type ?? node.type,
     data: nextData,
   };
 }

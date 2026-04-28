@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import type { EdgeType, ElementUpdates, SelectedElementData } from '../../graph/types';
+import { edgeTypeOptions, type EdgeType, type ElementUpdates, type SelectedElementData } from '../../graph/types';
 
 type SelectedEdgeElement = Extract<NonNullable<SelectedElementData>, { type: 'edge' }>;
 
@@ -27,10 +27,9 @@ export function EdgeEditor({
           onChange={(e) => onElementUpdate({ kind: e.target.value as EdgeType })}
           className="w-full px-3 py-2 bg-input-background border border-border rounded-lg text-sm"
         >
-          <option value="supports">Supports</option>
-          <option value="depends_on">Depends on</option>
-          <option value="evidences">Evidences</option>
-          <option value="next">Next</option>
+          {edgeTypeOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
         </select>
       </div>
 

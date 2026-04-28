@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import type { CreateNodeData, NodeType } from '../../graph/types';
+import {
+  nodeStatusOptions,
+  nodeTypeOptions,
+  type CreateNodeData,
+  type NodeType,
+} from '../../graph/types';
 
 interface CreateNodeFormProps {
   onCreateNode: (type: NodeType, data: CreateNodeData) => void;
@@ -10,6 +15,8 @@ export function CreateNodeForm({ onCreateNode }: CreateNodeFormProps) {
   const [newNodeType, setNewNodeType] = useState<NodeType>('objective');
   const [newNodeTitle, setNewNodeTitle] = useState('');
   const [newNodeDescription, setNewNodeDescription] = useState('');
+  const [newNodeStatus, setNewNodeStatus] = useState('planned');
+  const [newNodeDate, setNewNodeDate] = useState('');
 
   const handleCreateNode = () => {
     if (!newNodeTitle.trim()) return;
@@ -17,10 +24,14 @@ export function CreateNodeForm({ onCreateNode }: CreateNodeFormProps) {
     onCreateNode(newNodeType, {
       label: newNodeTitle,
       description: newNodeDescription || undefined,
+      status: newNodeStatus,
+      date: newNodeDate || undefined,
     });
 
     setNewNodeTitle('');
     setNewNodeDescription('');
+    setNewNodeStatus('planned');
+    setNewNodeDate('');
   };
 
   return (
@@ -39,10 +50,9 @@ export function CreateNodeForm({ onCreateNode }: CreateNodeFormProps) {
           onChange={(e) => setNewNodeType(e.target.value as NodeType)}
           className="w-full px-3 py-2 bg-input-background border border-border rounded-lg text-sm"
         >
-          <option value="objective">Objective</option>
-          <option value="milestone">Milestone</option>
-          <option value="event">Event</option>
-          <option value="artifact">Artifact</option>
+          {nodeTypeOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
         </select>
       </div>
 
@@ -58,13 +68,36 @@ export function CreateNodeForm({ onCreateNode }: CreateNodeFormProps) {
       </div>
 
       <div>
-        <label className="text-sm block mb-2">Description (Optional)</label>
+        <label className="text-sm block mb-2">Description</label>
         <textarea
           value={newNodeDescription}
           onChange={(e) => setNewNodeDescription(e.target.value)}
           placeholder="Add a description..."
           rows={3}
           className="w-full px-3 py-2 bg-input-background border border-border rounded-lg text-sm resize-none"
+        />
+      </div>
+
+      <div>
+        <label className="text-sm block mb-2">Status</label>
+        <select
+          value={newNodeStatus}
+          onChange={(e) => setNewNodeStatus(e.target.value)}
+          className="w-full px-3 py-2 bg-input-background border border-border rounded-lg text-sm"
+        >
+          {nodeStatusOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="text-sm block mb-2">Date</label>
+        <input
+          type="date"
+          value={newNodeDate}
+          onChange={(e) => setNewNodeDate(e.target.value)}
+          className="w-full px-3 py-2 bg-input-background border border-border rounded-lg text-sm"
         />
       </div>
 
