@@ -397,7 +397,7 @@ function normalizeResponseType(value: unknown): AgentResult["responseType"] {
 }
 
 function normalizeCommitted(value: unknown): boolean {
-  return typeof value === "boolean" ? value : true;
+  return typeof value === "boolean" ? value : false;
 }
 
 function normalizeRecordArray(value: unknown): AgentResult["citations"] {
