@@ -1,4 +1,5 @@
 from typing import Any, Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -73,9 +74,39 @@ class RoadmapAgentRequest(BaseModel):
 
 
 class AgentOperation(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
     tool: str
     args: dict[str, Any] = Field(default_factory=dict)
     result: dict[str, Any] = Field(default_factory=dict)
+    status: Literal["success", "error", "skipped", "approval_required"] = "success"
+    startedAt: int | None = None
+    completedAt: int | None = None
+
+
+class GraphCitation(BaseModel):
+    kind: Literal["node", "edge", "artifact", "subgraph"]
+    id: str
+    title: str | None = None
+    relevance: str
+    confidence: float = Field(default=1.0, ge=0, le=1)
+
+
+class RiskFlag(BaseModel):
+    code: str
+    message: str
+    severity: Literal["low", "medium", "high"] = "medium"
+
+
+class ValidationReport(BaseModel):
+    ok: bool
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ApprovalRequest(BaseModel):
+    reason: str
+    summary: str
+    operations: list[AgentOperation] = Field(default_factory=list)
 
 
 class RoadmapAgentResponse(BaseModel):
@@ -83,3 +114,16 @@ class RoadmapAgentResponse(BaseModel):
     summary: str
     operations: list[AgentOperation] = Field(default_factory=list)
     model: str = "python-ai-service"
+    responseType: Literal[
+        "answer",
+        "graph_update",
+        "answer_and_graph_update",
+        "clarification",
+        "approval_required",
+        "error",
+    ] = "graph_update"
+    committed: bool = True
+    citations: list[GraphCitation] = Field(default_factory=list)
+    riskFlags: list[RiskFlag] = Field(default_factory=list)
+    validationReport: ValidationReport | None = None
+    approvalRequest: ApprovalRequest | None = None
