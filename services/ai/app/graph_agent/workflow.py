@@ -8,6 +8,7 @@ from .errors import AgentExecutionError
 from .graph_tools import GraphToolRuntime
 from .models import create_openrouter_model
 from .prompts import SYSTEM_PROMPT
+from .tools import build_graph_tools
 
 
 def run_graph_agent(
@@ -33,7 +34,7 @@ def run_graph_agent(
 def _run_langchain_agent(runtime: GraphToolRuntime, model: Any) -> RoadmapAgentResponse | None:
     try:
         from langchain.agents import create_agent
-        from langchain.tools import tool
+        tools = build_graph_tools(runtime)
     except ImportError as error:
         raise AgentExecutionError(
             "LangChain agent dependencies are not installed.",
@@ -41,67 +42,6 @@ def _run_langchain_agent(runtime: GraphToolRuntime, model: Any) -> RoadmapAgentR
             code="agent_dependency_missing",
         ) from error
 
-    @tool
-    def read_graph() -> dict[str, object]:
-        """Read a compact overview of the current roadmap graph or draft graph."""
-        return runtime.read_graph()
-
-    @tool
-    def search_graph(query: str, node_type: str | None = None, limit: int = 5) -> dict[str, object]:
-        """Search the roadmap graph and return matching nodes plus neighboring edges."""
-        return runtime.search_graph(query=query, node_type=node_type, limit=limit)
-
-    @tool
-    def create_graph_draft(objective: str | None = None) -> dict[str, object]:
-        """Create or initialize a draft roadmap graph for the user's objective."""
-        return runtime.create_graph_draft(objective=objective)
-
-    @tool
-    def create_node(
-        title: str,
-        node_type: str = "milestone",
-        description: str = "",
-        status: str = "planned",
-    ) -> dict[str, object]:
-        """Create one node in the draft graph."""
-        return runtime.create_node(title=title, node_type=node_type, description=description, status=status)
-
-    @tool
-    def create_edge(source: str, target: str, kind: str = "supports", label: str | None = None) -> dict[str, object]:
-        """Create one typed edge in the draft graph."""
-        return runtime.create_edge(source=source, target=target, kind=kind, label=label)
-
-    @tool
-    def delete_node(node_id: str) -> dict[str, object]:
-        """Delete one node from the draft graph and remove all connected edges."""
-        return runtime.delete_node(node_id=node_id)
-
-    @tool
-    def delete_edge(edge_id: str) -> dict[str, object]:
-        """Delete one edge from the draft graph."""
-        return runtime.delete_edge(edge_id=edge_id)
-
-    @tool
-    def validate_graph() -> dict[str, object]:
-        """Validate the active graph or draft graph."""
-        return runtime.validate_graph()
-
-    @tool
-    def commit_graph() -> dict[str, object]:
-        """Mark the current valid draft as the final graph candidate."""
-        return runtime.commit_graph()
-
-    tools: list[Callable[..., object]] = [
-        read_graph,
-        search_graph,
-        create_graph_draft,
-        create_node,
-        create_edge,
-        delete_node,
-        delete_edge,
-        validate_graph,
-        commit_graph,
-    ]
     agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT)
     try:
         result = agent.invoke(
@@ -146,7 +86,7 @@ def _run_deterministic_agent(runtime: GraphToolRuntime) -> RoadmapAgentResponse:
             code="model_required",
         )
 
-    runtime.create_graph_draft(runtime.request.message)
+    runtime.scaffold_graph_from_objective(runtime.request.message)
     runtime.validate_graph()
     runtime.commit_graph()
     summary = "Created a committed roadmap graph draft."
@@ -154,6 +94,7 @@ def _run_deterministic_agent(runtime: GraphToolRuntime) -> RoadmapAgentResponse:
 
 
 def _response_from_runtime(runtime: GraphToolRuntime, summary: str, model_name: str) -> RoadmapAgentResponse:
+    _commit_valid_uncommitted_draft(runtime)
     committed = runtime.committed_candidate is not None
     changed = committed and runtime.committed_candidate != runtime.current_graph
     response_type = "graph_update" if changed else "answer"
@@ -167,6 +108,17 @@ def _response_from_runtime(runtime: GraphToolRuntime, summary: str, model_name: 
         citations=runtime.citations,
         validationReport=runtime.validation_report,
     )
+
+
+def _commit_valid_uncommitted_draft(runtime: GraphToolRuntime) -> None:
+    if runtime.committed_candidate is not None or runtime.draft_graph is None:
+        return
+    if runtime.draft_graph == runtime.current_graph:
+        return
+
+    validation_result = runtime.validate_graph()
+    if validation_result.get("ok") is True:
+        runtime.commit_graph()
 
 
 def _last_message_text(result: object) -> str:

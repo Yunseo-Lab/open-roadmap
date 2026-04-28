@@ -2,7 +2,12 @@ import os
 import unittest
 
 from app.graph_agent.graph_tools import GraphToolRuntime
-from app.graph_agent.workflow import _agent_recursion_limit, _openrouter_response_text_detail, run_graph_agent
+from app.graph_agent.workflow import (
+    _agent_recursion_limit,
+    _openrouter_response_text_detail,
+    _response_from_runtime,
+    run_graph_agent,
+)
 from app.schemas import (
     EdgeData,
     GraphEdge,
@@ -26,7 +31,7 @@ class GraphAgentTests(unittest.TestCase):
         self.assertEqual(response.responseType, "graph_update")
         self.assertTrue(response.committed)
         self.assertGreaterEqual(len(response.graph.nodes), 3)
-        self.assertTrue(any(operation.tool == "create_graph_draft" for operation in response.operations))
+        self.assertTrue(any(operation.tool == "scaffold_graph_from_objective" for operation in response.operations))
         self.assertTrue(any(operation.tool == "commit_graph" for operation in response.operations))
         self.assertIsNotNone(response.validationReport)
         self.assertTrue(response.validationReport.ok)
@@ -45,6 +50,27 @@ class GraphAgentTests(unittest.TestCase):
         self.assertTrue(result["recoverable"])
         self.assertEqual(runtime.operations[-1].status, "error")
 
+    def test_start_graph_draft_copies_existing_graph(self) -> None:
+        runtime = GraphToolRuntime(_request("Start from the current graph", _seeded_graph()))
+        result = runtime.start_graph_draft()
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["changed"])
+        self.assertEqual(result["nodeCount"], 2)
+        self.assertEqual(result["edgeCount"], 1)
+        self.assertEqual([node.id for node in runtime.active_graph.nodes], ["objective-main", "milestone-api"])
+        self.assertEqual(runtime.operations[-1].tool, "start_graph_draft")
+
+    def test_scaffold_graph_from_objective_creates_new_draft(self) -> None:
+        runtime = GraphToolRuntime(_request("Create a roadmap for backend engineering", _seeded_graph()))
+        result = runtime.scaffold_graph_from_objective("Backend engineering")
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["changed"])
+        self.assertGreaterEqual(result["nodeCount"], 3)
+        self.assertFalse(any(node.id == "objective-main" for node in runtime.active_graph.nodes))
+        self.assertEqual(runtime.operations[-1].tool, "scaffold_graph_from_objective")
+
     def test_delete_node_removes_incident_edges(self) -> None:
         runtime = GraphToolRuntime(_request("Delete the API milestone", _seeded_graph()))
         result = runtime.delete_node("milestone-api")
@@ -61,6 +87,18 @@ class GraphAgentTests(unittest.TestCase):
         self.assertEqual(len(runtime.final_graph().nodes), 1)
         self.assertEqual(len(runtime.final_graph().edges), 0)
 
+    def test_response_auto_commits_valid_uncommitted_draft(self) -> None:
+        runtime = GraphToolRuntime(_request("Delete the API milestone", _seeded_graph()))
+        runtime.delete_node("milestone-api")
+
+        response = _response_from_runtime(runtime, "Deleted the API milestone.", "test-model")
+
+        self.assertTrue(response.committed)
+        self.assertEqual(response.responseType, "graph_update")
+        self.assertEqual([node.id for node in response.graph.nodes], ["objective-main"])
+        self.assertEqual(response.graph.edges, [])
+        self.assertEqual([operation.tool for operation in response.operations], ["delete_node", "validate_graph", "commit_graph"])
+
     def test_delete_edge_preserves_nodes(self) -> None:
         runtime = GraphToolRuntime(_request("Delete the supporting edge", _seeded_graph()))
         result = runtime.delete_edge("milestone-api-supports-objective-main")
@@ -70,6 +108,22 @@ class GraphAgentTests(unittest.TestCase):
         self.assertEqual(len(runtime.active_graph.nodes), 2)
         self.assertEqual(runtime.active_graph.edges, [])
         self.assertEqual(runtime.operations[-1].tool, "delete_edge")
+
+    def test_clear_graph_removes_all_nodes_and_edges(self) -> None:
+        runtime = GraphToolRuntime(_request("Clear the whole graph", _seeded_graph()))
+        result = runtime.clear_graph()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["deletedNodeCount"], 2)
+        self.assertEqual(result["deletedEdgeCount"], 1)
+        self.assertEqual(runtime.active_graph.nodes, [])
+        self.assertEqual(runtime.active_graph.edges, [])
+        self.assertEqual(runtime.operations[-1].tool, "clear_graph")
+
+        response = _response_from_runtime(runtime, "Cleared the graph.", "test-model")
+        self.assertTrue(response.committed)
+        self.assertEqual(response.graph.nodes, [])
+        self.assertEqual(response.graph.edges, [])
 
     def test_delete_missing_node_returns_recoverable_error(self) -> None:
         runtime = GraphToolRuntime(_request("Delete a missing node", _seeded_graph()))

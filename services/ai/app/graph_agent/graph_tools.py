@@ -43,21 +43,24 @@ class GraphToolRuntime:
         self._record("search_graph", {"query": query, "node_type": node_type, "limit": limit}, result)
         return result
 
-    def create_graph_draft(self, objective: str | None = None) -> dict[str, object]:
+    def start_graph_draft(self) -> dict[str, object]:
+        graph = self.current_graph.model_copy(deep=True)
+        self.draft_graph = graph
+        result = {
+            "ok": True,
+            "changed": False,
+            "reason": "Draft initialized from current graph.",
+            "nodeCount": len(graph.nodes),
+            "edgeCount": len(graph.edges),
+        }
+        self._record("start_graph_draft", {}, result)
+        return result
+
+    def scaffold_graph_from_objective(self, objective: str | None = None) -> dict[str, object]:
         objective_title = _clean_text(objective or self.request.message, "Core objective", 120)
         graph = self.current_graph.model_copy(deep=True)
-
-        if graph.nodes:
-            self.draft_graph = graph
-            result = {
-                "ok": True,
-                "changed": False,
-                "reason": "Draft initialized from existing graph.",
-                "nodeCount": len(graph.nodes),
-                "edgeCount": len(graph.edges),
-            }
-            self._record("create_graph_draft", {"objective": objective}, result)
-            return result
+        graph.nodes = []
+        graph.edges = []
 
         objective_id = _unique_id("objective", objective_title, set())
         milestone_id = _unique_id("milestone", "First milestone", {objective_id})
@@ -133,7 +136,12 @@ class GraphToolRuntime:
             "edgeCount": len(graph.edges),
             "validation": validation.model_dump(),
         }
-        self._record("create_graph_draft", {"objective": objective}, result, "success" if validation.ok else "error")
+        self._record(
+            "scaffold_graph_from_objective",
+            {"objective": objective},
+            result,
+            "success" if validation.ok else "error",
+        )
         return result
 
     def create_node(
@@ -237,6 +245,24 @@ class GraphToolRuntime:
         self.validation_report = validation
         result = {"ok": validation.ok, "edgeId": edge_id, "validation": validation.model_dump()}
         self._record("delete_edge", {"edge_id": edge_id}, result, "success" if validation.ok else "error")
+        return result
+
+    def clear_graph(self) -> dict[str, object]:
+        graph = self._ensure_draft()
+        deleted_node_count = len(graph.nodes)
+        deleted_edge_count = len(graph.edges)
+        graph.nodes = []
+        graph.edges = []
+
+        validation = validate_graph_contract(graph)
+        self.validation_report = validation
+        result = {
+            "ok": validation.ok,
+            "deletedNodeCount": deleted_node_count,
+            "deletedEdgeCount": deleted_edge_count,
+            "validation": validation.model_dump(),
+        }
+        self._record("clear_graph", {}, result, "success" if validation.ok else "error")
         return result
 
     def validate_graph(self) -> dict[str, object]:

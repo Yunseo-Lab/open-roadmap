@@ -107,10 +107,12 @@ User: Explain this roadmap.
 Agent: read_graph -> search_graph -> final answer with citations
 
 User: Draw a roadmap for learning distributed systems.
-Agent: read_graph -> create_graph_draft -> validate_graph -> commit_graph -> final report
+Agent: read_graph -> scaffold_graph_from_objective -> validate_graph -> final report
+Service finalize: validate draft -> commit valid candidate
 
 User: Add evidence from this PDF to the backend milestone.
-Agent: search_graph -> read_artifact -> attach_artifact -> validate_graph -> commit_graph -> final report
+Agent: search_graph -> start_graph_draft -> read_artifact -> attach_artifact -> validate_graph -> final report
+Service finalize: validate draft -> commit valid candidate
 ```
 
 Workflow nodes still matter, but they should wrap the loop with setup,
@@ -142,9 +144,10 @@ behind the existing ownership and graph-contract boundary.
 
 ### 4. Commit Is Explicit
 
-The agent should call `commit_graph` only when it believes the draft is ready.
-In the Python service, `commit_graph` marks the draft as the final candidate and
-returns a commit observation. The Worker performs the actual database write.
+The model should not own commit responsibility. It edits and validates the
+draft; the Python service finalizes the run by validating the draft, applying
+approval policy, and marking a valid candidate for the Worker to persist. The
+Worker performs the actual database write.
 
 This mirrors coding agents that edit a working tree first, run checks, then ask
 for review or commit.
@@ -195,7 +198,8 @@ should be precise enough that the model can choose them without guessing.
 
 | Tool | Purpose | Notes |
 | --- | --- | --- |
-| `create_graph_draft` | Create or replace the run's draft graph from a high-level plan. | High-level composite tool. Internally uses operation DSL. |
+| `start_graph_draft` | Start a draft by copying the current roadmap graph. | Use before editing an existing graph. |
+| `scaffold_graph_from_objective` | Create a new scaffold draft graph from a high-level objective. | Use for new roadmap creation. |
 | `update_graph_draft` | Apply a batch of graph edits to the draft. | Useful for multi-node edits. Internally uses operation DSL. |
 | `create_node` | Add one node to the draft. | Validate type and ID uniqueness. |
 | `update_node` | Patch one node's type, title, description, status, position, or metadata. | Preserve unspecified fields. |
@@ -217,7 +221,10 @@ should be precise enough that the model can choose them without guessing.
 | `critique_graph` | Score graph usefulness, clarity, evidence grounding, and edge semantics. |
 | `repair_graph` | Apply safe repair edits after validation/critique failures. |
 | `request_approval` | Produce an approval payload for risky changes. |
-| `commit_graph` | Mark the current draft as the final graph candidate for Worker persistence. |
+
+Commit is an internal finalization step, not a model-facing tool. This keeps the
+model focused on graph edits while the service owns validation, approval policy,
+and persistence handoff.
 
 ### Memory And Skill Tools
 
@@ -286,7 +293,7 @@ class GraphOperation(BaseModel):
 ```
 
 This DSL is not the agent's top-level output. It is the safe execution format
-inside `create_graph_draft` and `update_graph_draft`.
+inside scaffold and batch draft tools.
 
 ## LangGraph Runtime Design
 
@@ -430,11 +437,11 @@ Expected response:
 User: Create a roadmap for becoming a backend engineer.
 Agent: read_graph
 Agent: list_graph_types
-Agent: create_graph_draft
+Agent: scaffold_graph_from_objective
 Agent: validate_graph
 Agent: layout_graph
-Agent: commit_graph
 Agent: final report
+Service finalize: validate draft and commit valid candidate
 ```
 
 Expected response:
@@ -442,7 +449,7 @@ Expected response:
 - `responseType = "graph_update"`
 - `committed = true`
 - `graph` is the committed candidate
-- `operations` shows draft, validation, layout, and commit tools
+- `operations` shows draft, validation, layout, and service finalization
 
 ### Existing Graph Edit
 
@@ -452,8 +459,8 @@ Agent: search_graph(query="deployment milestone")
 Agent: create_node
 Agent: create_edge
 Agent: validate_graph
-Agent: commit_graph
 Agent: final report
+Service finalize: validate draft and commit valid candidate
 ```
 
 Expected response:
@@ -625,13 +632,13 @@ It should still be scratch-built for learning. The important shared pieces are:
 - Implement deterministic tools:
   - `read_graph`
   - `search_graph`
-  - `create_graph_draft`
+  - `start_graph_draft`
+  - `scaffold_graph_from_objective`
   - `create_node`
   - `create_edge`
   - `validate_graph`
-  - `commit_graph`
 - Keep the existing fallback graph behavior available through
-  `create_graph_draft`.
+  `scaffold_graph_from_objective`.
 - Add Python tests for tool handlers and response shape.
 
 ### Phase 2: LangGraph Tool Loop
@@ -641,7 +648,7 @@ It should still be scratch-built for learning. The important shared pieces are:
 - Use OpenRouter-compatible chat model.
 - Cap iterations.
 - Return read-only answers without graph commits.
-- Return graph edits only after `commit_graph`.
+- Return graph edits only after service-side finalization validates the draft.
 
 ### Phase 3: Graph QA With Citations
 
