@@ -5,6 +5,7 @@ export type AppSecrets = {
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   OPENROUTER_API_KEY?: string;
+  AI_SERVICE_TOKEN?: string;
 };
 
 type RuntimeVars = {

@@ -1,0 +1,4 @@
+{$AI_SERVICE_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy ai:8000
+}

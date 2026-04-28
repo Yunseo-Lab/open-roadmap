@@ -224,6 +224,16 @@ to:
 POST {AI_SERVICE_URL}/roadmap-agent/runs
 ```
 
+If `AI_SERVICE_TOKEN` is configured as a Worker secret, the Worker also sends:
+
+```http
+Authorization: Bearer <AI_SERVICE_TOKEN>
+```
+
+The Python service enforces that bearer token on `/roadmap-agent/*` when
+`AI_SERVICE_TOKEN` is set. In `APP_ENV=production`, the Python service rejects
+agent requests if `AI_SERVICE_TOKEN` is missing.
+
 The Python service responds with:
 
 ```json
@@ -269,6 +279,15 @@ AI_SERVICE_URL=http://localhost:8000
 
 For local Wrangler, this normally belongs in `.dev.vars` or environment-specific
 configuration rather than a secret.
+
+For the DuckDNS Docker deployment, use:
+
+```text
+AI_SERVICE_URL=https://open-roadmaps.duckdns.org
+```
+
+Set the same `AI_SERVICE_TOKEN` in the Worker secret and the Python service
+`.env`.
 
 ## Persistence and Audit Tables
 

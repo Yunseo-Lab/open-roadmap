@@ -27,7 +27,7 @@
     "APP_ENV": "development",
     "BETTER_AUTH_URL": "https://open-roadmap.yunseo-tech.workers.dev",
     "OPENROUTER_MODEL": "openai/gpt-4.1-mini",
-    "AI_SERVICE_URL": ""
+    "AI_SERVICE_URL": "https://open-roadmaps.duckdns.org"
   },
   "observability": {
     "enabled": true,

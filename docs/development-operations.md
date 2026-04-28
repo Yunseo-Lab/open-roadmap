@@ -63,6 +63,7 @@ returns `dev-user` when `APP_ENV` is not `production`.
 | `GOOGLE_CLIENT_ID` | secret | Enables Google login with client secret. |
 | `GOOGLE_CLIENT_SECRET` | secret | Enables Google login with client ID. |
 | `OPENROUTER_API_KEY` | secret | Enables real Worker-side OpenRouter agent. |
+| `AI_SERVICE_TOKEN` | secret | Shared bearer token used by Worker requests to the Python AI service. |
 
 Production secrets should be set with Wrangler:
 
@@ -71,9 +72,68 @@ npx wrangler secret put BETTER_AUTH_SECRET
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put OPENROUTER_API_KEY
+npx wrangler secret put AI_SERVICE_TOKEN
 ```
 
-`AI_SERVICE_URL` is usually an environment var, not a secret.
+`AI_SERVICE_URL` is usually an environment var, not a secret. For the DuckDNS
+deployment, set it to `https://open-roadmaps.duckdns.org`.
+
+## Dockerized Python AI Service
+
+The Python AI service can run outside Cloudflare as a Docker Compose stack under
+`services/ai`:
+
+| File | Purpose |
+| --- | --- |
+| `Dockerfile` | Builds the FastAPI/Uvicorn app image. |
+| `compose.yaml` | Runs the app plus Caddy. |
+| `Caddyfile` | Terminates HTTPS for `open-roadmaps.duckdns.org` and proxies to `ai:8000`. |
+| `.env.example` | Documents runtime values used by both the app and Caddy. |
+
+Typical setup on the host:
+
+```bash
+cd services/ai
+cp .env.example .env
+```
+
+Fill `.env` with:
+
+```dotenv
+OPENROUTER_API_KEY=<openrouter-key>
+OPENROUTER_MODEL=openai/gpt-4.1-mini
+OPENROUTER_SITE_URL=https://open-roadmap.your-worker.workers.dev
+OPENROUTER_APP_TITLE=Open Roadmap
+AGENT_RECURSION_LIMIT=48
+APP_ENV=production
+ALLOW_DETERMINISTIC_AGENT_FALLBACK=false
+AI_SERVICE_TOKEN=<long-random-shared-token>
+AI_SERVICE_DOMAIN=open-roadmaps.duckdns.org
+```
+
+DuckDNS should point `open-roadmaps.duckdns.org` to the host's public IP.
+Forward ports `80` and `443` from the router or firewall to the Docker host so
+Caddy can obtain and renew certificates. Then run:
+
+```bash
+docker compose up -d --build
+docker compose logs -f ai caddy
+```
+
+Health check:
+
+```bash
+curl https://open-roadmaps.duckdns.org/health
+```
+
+Protected agent endpoints require:
+
+```http
+Authorization: Bearer <AI_SERVICE_TOKEN>
+```
+
+The Cloudflare Worker adds this header automatically when the Worker secret
+`AI_SERVICE_TOKEN` is set.
 
 ## Database Migrations
 
@@ -260,4 +320,3 @@ architecture document. Examples:
 - Changed local ports or proxy targets.
 - Changed deployment process.
 - Added service dependencies.
-

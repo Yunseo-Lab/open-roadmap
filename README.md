@@ -54,8 +54,12 @@ npx wrangler secret put BETTER_AUTH_SECRET
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put OPENROUTER_API_KEY
+npx wrangler secret put AI_SERVICE_TOKEN
 ```
 
-`AI_SERVICE_URL`은 secret이 아니라 환경별 `vars`로 두면 됩니다.
+`AI_SERVICE_URL`은 secret이 아니라 환경별 `vars`로 두면 됩니다. Docker로
+띄운 Python AI service를 DuckDNS에서 서빙한다면
+`https://open-roadmaps.duckdns.org`를 넣고, Worker secret
+`AI_SERVICE_TOKEN`에는 AI service의 `.env`에 있는 같은 값을 넣습니다.
 
 로컬 개발에서는 `APP_ENV=development`일 때 Google OAuth가 없어도 개발용 사용자로 API를 사용할 수 있습니다.

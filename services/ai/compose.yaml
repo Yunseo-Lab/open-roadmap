@@ -1,0 +1,28 @@
+services:
+  ai:
+    build:
+      context: .
+    env_file:
+      - .env
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - ai
+    environment:
+      AI_SERVICE_DOMAIN: ${AI_SERVICE_DOMAIN:-open-roadmaps.duckdns.org}
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -62,9 +62,7 @@ export async function runPythonRoadmapAgent(input: AgentInput): Promise<AgentRes
   const request = await buildPythonRequest(input);
   const response = await fetch(`${request.serviceUrl}/roadmap-agent/runs`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: pythonServiceHeaders(input, false),
     body: JSON.stringify(request.body),
   });
 
@@ -89,10 +87,7 @@ export async function streamPythonRoadmapAgent(
   const request = await buildPythonRequest(input);
   const response = await fetch(`${request.serviceUrl}/roadmap-agent/runs/stream`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-    },
+    headers: pythonServiceHeaders(input, true),
     body: JSON.stringify(request.body),
   });
 
@@ -311,6 +306,22 @@ function normalizeOperation(value: unknown): AgentOperation | null {
   };
 }
 
+function pythonServiceHeaders(input: AgentInput, acceptsStream: boolean): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (acceptsStream) {
+    headers.Accept = "text/event-stream";
+  }
+
+  const token = input.env.AI_SERVICE_TOKEN?.trim();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 function stringField(value: Record<string, unknown>, key: string): string {
   const field = value[key];
   return typeof field === "string" ? field.trim() : "";
@@ -348,6 +359,15 @@ function parsePythonError(body: string): { message: string; code?: string } {
 
     if (typeof payload.error === "string" && payload.error.trim()) {
       return { message: payload.error };
+    }
+    if (payload.error && typeof payload.error === "object" && !Array.isArray(payload.error)) {
+      const candidate = payload.error as { message?: unknown; code?: unknown };
+      if (typeof candidate.message === "string" && candidate.message.trim()) {
+        return {
+          message: candidate.message,
+          code: typeof candidate.code === "string" ? candidate.code : undefined,
+        };
+      }
     }
   } catch {
     // Fall through to the raw body preview.

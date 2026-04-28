@@ -6,3 +6,4 @@ GOOGLE_CLIENT_SECRET=replace-with-google-client-secret
 OPENROUTER_API_KEY=replace-with-openrouter-api-key
 OPENROUTER_MODEL=openai/gpt-4.1-mini
 AI_SERVICE_URL=http://localhost:8000
+AI_SERVICE_TOKEN=replace-with-shared-ai-service-token
