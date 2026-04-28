@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Background,
   ConnectionMode,
@@ -9,6 +10,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { withAutoEdgeHandles } from './edgeHandles';
 import { graphNodeTypes } from './nodeTypes';
 import type { GraphEdge, GraphNode } from './types';
 
@@ -45,10 +47,12 @@ export function GraphViewport({
   zoomOnScroll,
   controlsInteractive = true,
 }: GraphViewportProps) {
+  const displayEdges = useMemo(() => withAutoEdgeHandles(nodes, edges), [nodes, edges]);
+
   return (
     <ReactFlow
       nodes={nodes}
-      edges={edges}
+      edges={displayEdges}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
