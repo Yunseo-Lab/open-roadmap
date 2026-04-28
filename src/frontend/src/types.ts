@@ -89,6 +89,28 @@ export type RoadmapGraph = {
 export type SaveRoadmapGraphInput = Pick<RoadmapGraph, "nodes" | "edges"> &
   Partial<Pick<RoadmapGraph, "nodeTypes" | "edgeTypes">>;
 
+export type AgentOperation = {
+  id?: string;
+  tool: string;
+  args: Record<string, unknown>;
+  result: Record<string, unknown>;
+  status?: "success" | "error" | "skipped" | "approval_required";
+  startedAt?: number | null;
+  completedAt?: number | null;
+};
+
+export type AgentResponse = {
+  summary: string;
+  operations: AgentOperation[];
+  graph: RoadmapGraph;
+  responseType?: "answer" | "graph_update" | "answer_and_graph_update" | "clarification" | "approval_required" | "error";
+  committed?: boolean;
+  citations?: Record<string, unknown>[];
+  riskFlags?: Record<string, unknown>[];
+  validationReport?: Record<string, unknown> | null;
+  approvalRequest?: Record<string, unknown> | null;
+};
+
 export type Artifact = {
   id: string;
   title: string;

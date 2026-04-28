@@ -8,7 +8,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { api } from '../../lib/api';
-import type { Roadmap } from '../../types';
+import type { Roadmap, RoadmapGraph } from '../../types';
 import { toApiGraph, toWorkspaceEdge, toWorkspaceNode } from './adapter';
 import type {
   CreateNodeData,
@@ -91,6 +91,14 @@ export function useWorkspaceGraph(
           : currentRoadmap
       )),
     );
+  }, []);
+
+  const applyServerGraph = useCallback((serverGraph: RoadmapGraph) => {
+    setNodes(serverGraph.nodes.map(toWorkspaceNode));
+    setEdges(serverGraph.edges.map(toWorkspaceEdge));
+    setSelectedElement(null);
+    setIsDirty(false);
+    setSaveError(null);
   }, []);
 
   const {
@@ -372,6 +380,7 @@ export function useWorkspaceGraph(
     handleDeleteSelectedElement,
     handleSaveGraph,
     ensureGraphSaved,
+    applyServerGraph,
     applyRoadmapUpdate,
     applyArtifactVisibility,
     handleUploadArtifact: uploadArtifact,

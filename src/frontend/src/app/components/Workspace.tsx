@@ -13,7 +13,8 @@ import { RoadmapDeleteDialog } from './RoadmapDeleteDialog';
 import { useAuth } from '../auth/AuthProvider';
 import { useWorkspaceGraph } from '../graph/useWorkspaceGraph';
 import { api } from '../../lib/api';
-import type { PublishRoadmapInput, Roadmap } from '../../types';
+import type { AgentResponse, PublishRoadmapInput, Roadmap } from '../../types';
+import type { AgentStreamHandlers } from '../../lib/api';
 
 export function Workspace() {
   const { roadmapId } = useParams<{ roadmapId: string }>();
@@ -104,6 +105,21 @@ export function Workspace() {
     } finally {
       setPublishing(false);
     }
+  }, [graph, selectedRoadmap]);
+
+  const handleAgentMessage = useCallback(async (
+    message: string,
+    handlers: AgentStreamHandlers,
+  ): Promise<AgentResponse> => {
+    if (!selectedRoadmap) {
+      throw new Error('Roadmap is required.');
+    }
+
+    handlers.onStatus?.('Saving current graph.');
+    await graph.ensureGraphSaved();
+    const result = await api.runAgentStream(selectedRoadmap, { content: message, artifactIds: [] }, handlers);
+    graph.applyServerGraph(result.graph);
+    return result;
   }, [graph, selectedRoadmap]);
 
   function openDeleteRoadmapDialog(roadmap: Roadmap) {
@@ -207,7 +223,7 @@ export function Workspace() {
         <AccountButton user={user} onSignOut={signOut} />
       </div>
 
-      <AIChat isOpen={true} />
+      <AIChat isOpen={true} disabled={graph.isSaving} onSend={handleAgentMessage} />
 
       <PublishPreview
         isOpen={isPreviewOpen}
