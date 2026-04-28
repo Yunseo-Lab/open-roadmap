@@ -199,7 +199,7 @@ should be precise enough that the model can choose them without guessing.
 | `update_graph_draft` | Apply a batch of graph edits to the draft. | Useful for multi-node edits. Internally uses operation DSL. |
 | `create_node` | Add one node to the draft. | Validate type and ID uniqueness. |
 | `update_node` | Patch one node's type, title, description, status, position, or metadata. | Preserve unspecified fields. |
-| `delete_node` | Delete one node, optionally cascading connected edges. | Risk score required. |
+| `delete_node` | Delete one node and cascade connected edges. | Risk score required. |
 | `create_edge` | Add one typed edge to the draft. | Validate endpoints and edge kind. |
 | `update_edge` | Patch edge label, type, kind, or metadata. | Preserve source/target unless explicitly supported. |
 | `delete_edge` | Delete one edge. | Risk score required. |

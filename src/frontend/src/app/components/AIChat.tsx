@@ -569,6 +569,7 @@ function toolIcon(operation: AgentOperation) {
   if (operation.tool.includes('search')) return <Search className="size-3.5" />;
   if (operation.tool.includes('read')) return <FileSearch className="size-3.5" />;
   if (operation.tool.includes('commit')) return <GitCommit className="size-3.5" />;
+  if (operation.tool.includes('delete')) return <Trash2 className="size-3.5" />;
   if (!operation.completedAt) return <Clock3 className="size-3.5" />;
   return <Wrench className="size-3.5" />;
 }
@@ -605,6 +606,15 @@ function operationSummary(operation: AgentOperation): string {
   }
   if (operation.tool === 'create_edge') {
     return `Created edge ${stringField(result, 'edgeId') || stringField(result, 'id') || ''}`.trim();
+  }
+  if (operation.tool === 'delete_node') {
+    const deletedEdgeCount = numberField(result, 'deletedEdgeCount');
+    const deletedEdgeIds = arrayField(result, 'deletedEdgeIds');
+    const edgeCount = deletedEdgeCount ?? deletedEdgeIds.length;
+    return `Deleted node ${stringField(result, 'nodeId') || stringField(result, 'id') || ''} and ${edgeCount} connected edge${edgeCount === 1 ? '' : 's'}.`.trim();
+  }
+  if (operation.tool === 'delete_edge') {
+    return `Deleted edge ${stringField(result, 'edgeId') || stringField(result, 'id') || ''}`.trim();
   }
   if (operation.tool === 'validate_graph') {
     const validation = recordField(result, 'validation');

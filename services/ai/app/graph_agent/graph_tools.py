@@ -198,6 +198,47 @@ class GraphToolRuntime:
         self._record("create_edge", {"source": source, "target": target, "kind": kind}, result)
         return result
 
+    def delete_node(self, node_id: str) -> dict[str, object]:
+        graph = self._ensure_draft()
+        if not any(node.id == node_id for node in graph.nodes):
+            return self._tool_error("delete_node", {"node_id": node_id}, f"Node not found: {node_id}")
+
+        deleted_edge_ids = [
+            edge.id
+            for edge in graph.edges
+            if edge.source == node_id or edge.target == node_id
+        ]
+        graph.nodes = [node for node in graph.nodes if node.id != node_id]
+        graph.edges = [
+            edge
+            for edge in graph.edges
+            if edge.source != node_id and edge.target != node_id
+        ]
+
+        validation = validate_graph_contract(graph)
+        self.validation_report = validation
+        result = {
+            "ok": validation.ok,
+            "nodeId": node_id,
+            "deletedEdgeIds": deleted_edge_ids,
+            "deletedEdgeCount": len(deleted_edge_ids),
+            "validation": validation.model_dump(),
+        }
+        self._record("delete_node", {"node_id": node_id}, result, "success" if validation.ok else "error")
+        return result
+
+    def delete_edge(self, edge_id: str) -> dict[str, object]:
+        graph = self._ensure_draft()
+        if not any(edge.id == edge_id for edge in graph.edges):
+            return self._tool_error("delete_edge", {"edge_id": edge_id}, f"Edge not found: {edge_id}")
+
+        graph.edges = [edge for edge in graph.edges if edge.id != edge_id]
+        validation = validate_graph_contract(graph)
+        self.validation_report = validation
+        result = {"ok": validation.ok, "edgeId": edge_id, "validation": validation.model_dump()}
+        self._record("delete_edge", {"edge_id": edge_id}, result, "success" if validation.ok else "error")
+        return result
+
     def validate_graph(self) -> dict[str, object]:
         validation = validate_graph_contract(self.active_graph)
         self.validation_report = validation

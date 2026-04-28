@@ -72,6 +72,16 @@ def _run_langchain_agent(runtime: GraphToolRuntime, model: Any) -> RoadmapAgentR
         return runtime.create_edge(source=source, target=target, kind=kind, label=label)
 
     @tool
+    def delete_node(node_id: str) -> dict[str, object]:
+        """Delete one node from the draft graph and remove all connected edges."""
+        return runtime.delete_node(node_id=node_id)
+
+    @tool
+    def delete_edge(edge_id: str) -> dict[str, object]:
+        """Delete one edge from the draft graph."""
+        return runtime.delete_edge(edge_id=edge_id)
+
+    @tool
     def validate_graph() -> dict[str, object]:
         """Validate the active graph or draft graph."""
         return runtime.validate_graph()
@@ -87,6 +97,8 @@ def _run_langchain_agent(runtime: GraphToolRuntime, model: Any) -> RoadmapAgentR
         create_graph_draft,
         create_node,
         create_edge,
+        delete_node,
+        delete_edge,
         validate_graph,
         commit_graph,
     ]

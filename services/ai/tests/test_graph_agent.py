@@ -45,6 +45,40 @@ class GraphAgentTests(unittest.TestCase):
         self.assertTrue(result["recoverable"])
         self.assertEqual(runtime.operations[-1].status, "error")
 
+    def test_delete_node_removes_incident_edges(self) -> None:
+        runtime = GraphToolRuntime(_request("Delete the API milestone", _seeded_graph()))
+        result = runtime.delete_node("milestone-api")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["nodeId"], "milestone-api")
+        self.assertEqual(result["deletedEdgeIds"], ["milestone-api-supports-objective-main"])
+        self.assertEqual([node.id for node in runtime.active_graph.nodes], ["objective-main"])
+        self.assertEqual(runtime.active_graph.edges, [])
+        self.assertEqual(runtime.operations[-1].tool, "delete_node")
+
+        commit_result = runtime.commit_graph()
+        self.assertTrue(commit_result["ok"])
+        self.assertEqual(len(runtime.final_graph().nodes), 1)
+        self.assertEqual(len(runtime.final_graph().edges), 0)
+
+    def test_delete_edge_preserves_nodes(self) -> None:
+        runtime = GraphToolRuntime(_request("Delete the supporting edge", _seeded_graph()))
+        result = runtime.delete_edge("milestone-api-supports-objective-main")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["edgeId"], "milestone-api-supports-objective-main")
+        self.assertEqual(len(runtime.active_graph.nodes), 2)
+        self.assertEqual(runtime.active_graph.edges, [])
+        self.assertEqual(runtime.operations[-1].tool, "delete_edge")
+
+    def test_delete_missing_node_returns_recoverable_error(self) -> None:
+        runtime = GraphToolRuntime(_request("Delete a missing node", _seeded_graph()))
+        result = runtime.delete_node("missing-node")
+
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["recoverable"])
+        self.assertEqual(runtime.operations[-1].status, "error")
+
     def test_commit_without_draft_is_recoverable_error(self) -> None:
         runtime = GraphToolRuntime(_request("Commit the graph", _seeded_graph()))
         result = runtime.commit_graph()

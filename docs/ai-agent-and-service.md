@@ -252,7 +252,8 @@ The Python service responds with:
 types, persists it with `replaceGraph`, and normalizes operations. The Python
 service now has a graph tool runtime and an optional LangChain `create_agent`
 loop. It edits an in-memory draft graph through tools, validates the draft, and
-returns a committed candidate for the Worker to persist. If `OPENROUTER_API_KEY`
+returns a committed candidate for the Worker to persist. Node deletion removes
+the node and all incident edges from the draft before validation. If `OPENROUTER_API_KEY`
 or LangChain dependencies are unavailable, it can fall back to deterministic
 graph tools for local graph creation tests. That fallback does not answer graph
 questions and model-call errors are returned as errors. In production, set
