@@ -2,6 +2,14 @@
 
 이 문서는 Open Roadmap 백엔드의 현재 구조, 런타임 구성, API 계약, 데이터 모델, AI Agent 흐름을 설명한다. 기준 코드는 `src/backend`, `src/shared`, `migrations`, `wrangler.jsonc`이다.
 
+관련 문서:
+
+- 전체 문서 지도: [Documentation README](./README.md)
+- 프론트엔드 라우팅, 상태, 화면 구조: [Frontend Architecture](./frontend-architecture.md)
+- 그래프 타입, 어댑터, 검증 규칙: [Graph Contract](./graph-contract.md)
+- AI Agent와 Python 서비스 계약: [AI Agent and Service](./ai-agent-and-service.md)
+- 로컬 실행, 마이그레이션, 배포: [Development and Operations](./development-operations.md)
+
 ## 요약
 
 Open Roadmap 백엔드는 Cloudflare Workers 위에서 실행되는 Hono 애플리케이션이다. Worker는 API 요청을 직접 처리하고, 프론트엔드 정적 에셋은 Wrangler Assets binding을 통해 제공한다.
@@ -729,6 +737,8 @@ Response:
 
 ## Frontend Integration Notes
 
+프론트엔드 구조 전체는 [Frontend Architecture](./frontend-architecture.md)를, 그래프 변환 규칙은 [Graph Contract](./graph-contract.md)를 기준으로 한다. 이 섹션은 백엔드 API와 직접 맞닿는 통합 규칙만 요약한다.
+
 The backend-facing frontend client should keep a thin API wrapper around `fetch`:
 
 - Always pass `credentials: "include"`.
@@ -740,7 +750,7 @@ The current frontend client in `src/frontend/src/lib/api.ts` follows this patter
 
 ### Graph adapter requirement
 
-The current Figma frontend uses a React Flow node shape like:
+The current frontend uses a React Flow node shape like:
 
 ```ts
 {
@@ -757,23 +767,13 @@ The current Figma frontend uses a React Flow node shape like:
 }
 ```
 
-The backend uses `data.title`, not `data.label`, and stores extra fields in `data.metadata`. Migration should add a frontend adapter:
+The backend uses `data.title`, not `data.label`, and stores extra fields in `data.metadata`. The active adapter is `src/frontend/src/app/graph/adapter.ts`:
 
-```ts
-function graphToFlow(graph: RoadmapGraph): FlowState {
-  // title -> label
-  // metadata.date -> date
-  // artifact metadata/artifacts -> attachments
-}
+- `toApiGraph` converts React Flow workspace state into backend graph input.
+- `toWorkspaceNode` and `toWorkspaceEdge` restore backend graph output into editable workspace state.
+- Adapter round trips are covered by `src/frontend/src/app/graph/adapter.test.ts`.
 
-function flowToGraph(flow: FlowState, nodeTypes: TypeDefinition[], edgeTypes: TypeDefinition[]): RoadmapGraph {
-  // label -> title
-  // date and attachments -> metadata
-  // edge kind must be supports | depends_on | evidences | next, not depends
-}
-```
-
-Do not send the Figma mock graph directly to `PATCH /api/roadmaps/:id/graph`. It will fail validation or lose semantic metadata.
+Do not bypass the adapter when calling `PATCH /api/roadmaps/:id/graph`; direct React Flow objects can fail validation or lose semantic metadata.
 
 ## Error Model
 

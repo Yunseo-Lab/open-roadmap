@@ -16,6 +16,17 @@ services/
 
 Cloudflare Worker 백엔드는 그대로 Hono/D1/R2를 사용합니다. `AI_SERVICE_URL`이 설정되어 있으면 Worker가 Python AI 서비스의 `/roadmap-agent/runs`로 위임하고, 설정되어 있지 않으면 기존 TypeScript OpenRouter/local fallback Agent를 사용합니다.
 
+## Documentation
+
+자세한 구조와 작업별 참고 문서는 `docs/`에 있습니다.
+
+- [Documentation map](docs/README.md)
+- [Backend architecture](docs/backend-architecture.md)
+- [Frontend architecture](docs/frontend-architecture.md)
+- [Graph contract](docs/graph-contract.md)
+- [AI agent and service](docs/ai-agent-and-service.md)
+- [Development and operations](docs/development-operations.md)
+
 ## Local setup
 
 ```bash
