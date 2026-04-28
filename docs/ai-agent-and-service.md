@@ -3,6 +3,9 @@
 This document describes how AI graph generation is currently implemented and
 where the frontend integration still needs work.
 
+For the target tool-calling graph copilot design, see
+[Graph Copilot Agent Architecture](./agent-architecture.md).
+
 ## Summary
 
 The backend has one AI endpoint:
@@ -44,7 +47,7 @@ sequenceDiagram
   Adapter->>Adapter: run Python, OpenRouter, or fallback
   Adapter->>Graph: replaceGraph normalizes and persists graph
   Route->>D1: insert assistant message and ai_runs row
-  Route-->>Client: summary, operations, graph
+  Route-->>Client: summary, operations, graph, response metadata
 ```
 
 If the agent fails, the route inserts a failed `ai_runs` row and returns `500`.
@@ -77,7 +80,13 @@ Response:
     "edges": [],
     "nodeTypes": [],
     "edgeTypes": []
-  }
+  },
+  "responseType": "graph_update",
+  "committed": true,
+  "citations": [],
+  "riskFlags": [],
+  "validationReport": null,
+  "approvalRequest": null
 }
 ```
 
@@ -193,6 +202,7 @@ Files:
 - `services/ai/app/main.py`
 - `services/ai/app/agent.py`
 - `services/ai/app/schemas.py`
+- `services/ai/app/graph_agent/*`
 - `src/backend/ai/python-client.ts`
 
 When `AI_SERVICE_URL` is set, the Worker sends:
@@ -221,24 +231,33 @@ The Python service responds with:
   "graph": {},
   "summary": "AI service updated the roadmap.",
   "operations": [],
-  "model": "python-ai-service"
+  "model": "python-langchain-openrouter",
+  "responseType": "graph_update",
+  "committed": true,
+  "citations": []
 }
 ```
 
 `python-client.ts` normalizes the returned graph against current node and edge
-types, persists it with `replaceGraph`, and normalizes operations.
-
-The current Python implementation is a contract skeleton. It returns a fallback
-starter graph when the input graph is empty. Replace
-`services/ai/app/agent.py::build_graph_response` with the real agent workflow.
+types, persists it with `replaceGraph`, and normalizes operations. The Python
+service now has a graph tool runtime and an optional LangChain `create_agent`
+loop. It edits an in-memory draft graph through tools, validates the draft, and
+returns a committed candidate for the Worker to persist. If `OPENROUTER_API_KEY`
+or LangChain dependencies are unavailable, it can fall back to deterministic
+graph tools for local graph creation tests. That fallback does not answer graph
+questions and model-call errors are returned as errors. In production, set
+`APP_ENV=production` in the Python service to disable deterministic fallback
+unless `ALLOW_DETERMINISTIC_AGENT_FALLBACK=true` is explicitly configured. The
+Worker persists the returned graph only when the Python response has
+`committed: true`.
 
 ## Running The Python Service Locally
 
 ```bash
 cd services/ai
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install '.[dev]'
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -312,4 +331,5 @@ When modifying AI behavior:
 4. Make artifact loading limits explicit if changed.
 5. Add route or adapter tests for new response shapes.
 6. Update [Graph Contract](./graph-contract.md) if metadata keys or types change.
-
+7. Update [Graph Copilot Agent Architecture](./agent-architecture.md) if the
+   agent loop, tool catalog, approval policy, or response contract changes.

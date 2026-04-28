@@ -12,6 +12,7 @@ touch.
 | [Frontend Architecture](./frontend-architecture.md) | You are changing `src/frontend`, routes, screens, state hooks, styling, or the React Flow workspace. |
 | [Graph Contract](./graph-contract.md) | You are changing graph node/edge shapes, type definitions, React Flow adapters, AI graph output, or persistence. |
 | [AI Agent and Service](./ai-agent-and-service.md) | You are wiring AI chat, changing OpenRouter/Python service behavior, or debugging agent graph writes. |
+| [Graph Copilot Agent Architecture](./agent-architecture.md) | You are designing or implementing the tool-calling roadmap graph agent. |
 | [Development and Operations](./development-operations.md) | You are setting up the project, running local services, applying D1 migrations, or preparing deployment. |
 
 ## System Overview
@@ -67,7 +68,8 @@ When changing the codebase, update the docs using this checklist:
 2. Graph shape, metadata, type definitions, node handles, or validation changes: update [Graph Contract](./graph-contract.md).
 3. UI screen composition, auth routing, workspace panels, or design token changes: update [Frontend Architecture](./frontend-architecture.md).
 4. AI request/response, tool calls, artifact loading, or Python service contract changes: update [AI Agent and Service](./ai-agent-and-service.md).
-5. New commands, bindings, secrets, migrations, or deployment steps: update [Development and Operations](./development-operations.md).
+5. Agent architecture, tool catalog, graph QA, evaluation, memory, retrieval, or model strategy changes: update [Graph Copilot Agent Architecture](./agent-architecture.md).
+6. New commands, bindings, secrets, migrations, or deployment steps: update [Development and Operations](./development-operations.md).
 
 ## Current Known Gaps
 
@@ -82,4 +84,3 @@ These are documented because they affect future implementation choices:
 - AI conversation history is stored but not exposed through a read endpoint.
 - Custom graph type creation exists on the backend, but the current
   `src/frontend` workspace UI only exposes the default node and edge types.
-
