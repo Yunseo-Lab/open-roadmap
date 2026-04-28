@@ -320,7 +320,7 @@ function RunCard({ run }: { run: TranscriptRun }) {
   );
 }
 
-function MarkdownContent({ content }: { content: string }) {
+export function MarkdownContent({ content }: { content: string }) {
   const lines = content.replace(/\r\n/g, '\n').split('\n');
   const blocks: ReactNode[] = [];
   let index = 0;
@@ -596,10 +596,15 @@ function operationSummary(operation: AgentOperation): string {
     const nodes = arrayField(matches, 'nodes');
     return `Searched graph context and found ${nodes.length} matching node${nodes.length === 1 ? '' : 's'}.`;
   }
-  if (operation.tool === 'create_graph_draft') {
+  if (operation.tool === 'start_graph_draft') {
     const nodeCount = numberField(result, 'nodeCount');
     const edgeCount = numberField(result, 'edgeCount');
-    return `Created graph draft${nodeCount !== null ? ` with ${nodeCount} nodes` : ''}${edgeCount !== null ? ` and ${edgeCount} edges` : ''}.`;
+    return `Started graph draft${nodeCount !== null ? ` with ${nodeCount} nodes` : ''}${edgeCount !== null ? ` and ${edgeCount} edges` : ''}.`;
+  }
+  if (operation.tool === 'scaffold_graph_from_objective') {
+    const nodeCount = numberField(result, 'nodeCount');
+    const edgeCount = numberField(result, 'edgeCount');
+    return `Scaffolded graph draft${nodeCount !== null ? ` with ${nodeCount} nodes` : ''}${edgeCount !== null ? ` and ${edgeCount} edges` : ''}.`;
   }
   if (operation.tool === 'create_node') {
     return `Created node ${stringField(result, 'nodeId') || stringField(result, 'id') || ''}`.trim();
@@ -615,6 +620,11 @@ function operationSummary(operation: AgentOperation): string {
   }
   if (operation.tool === 'delete_edge') {
     return `Deleted edge ${stringField(result, 'edgeId') || stringField(result, 'id') || ''}`.trim();
+  }
+  if (operation.tool === 'clear_graph') {
+    const deletedNodeCount = numberField(result, 'deletedNodeCount') ?? 0;
+    const deletedEdgeCount = numberField(result, 'deletedEdgeCount') ?? 0;
+    return `Cleared graph: deleted ${deletedNodeCount} node${deletedNodeCount === 1 ? '' : 's'} and ${deletedEdgeCount} edge${deletedEdgeCount === 1 ? '' : 's'}.`;
   }
   if (operation.tool === 'validate_graph') {
     const validation = recordField(result, 'validation');

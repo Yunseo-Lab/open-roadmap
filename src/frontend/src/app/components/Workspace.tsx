@@ -21,7 +21,7 @@ export function Workspace() {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const selectedRoadmap = roadmapId || '';
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [isEditPanelCollapsed, setIsEditPanelCollapsed] = useState(true);
   const [isPublishPanelCollapsed, setIsPublishPanelCollapsed] = useState(true);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -171,7 +171,7 @@ export function Workspace() {
         onPaneClick={graph.handlePaneClick}
       />
 
-      <div className="absolute top-4 left-4 z-40">
+      <div className="absolute top-4 left-4 z-[60]">
         <Sidebar
           selectedRoadmap={selectedRoadmap}
           roadmaps={graph.roadmaps}
