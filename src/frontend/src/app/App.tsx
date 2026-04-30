@@ -43,7 +43,7 @@ export default function App() {
             }
           />
           <Route path="/u/:handle" element={<PublicProfile />} />
-          <Route path="/r/:slug" element={<PublicRoadmap />} />
+          <Route path="/u/:handle/:slug" element={<PublicRoadmap />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

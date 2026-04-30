@@ -216,6 +216,7 @@ export function Workspace() {
           publishing={publishing}
           publishError={publishError}
           publishedSlug={publishedSlug || graph.roadmap.slug}
+          profileHandle={user.profile.handle}
           onToggleCollapse={() => setIsPublishPanelCollapsed(!isPublishPanelCollapsed)}
           onPreview={handlePreview}
           onPublish={handlePublishRoadmap}
@@ -232,6 +233,7 @@ export function Workspace() {
         edges={graph.edges}
         title={previewData.publicTitle || graph.roadmap.publicTitle || graph.roadmap.title}
         slug={previewData.slug}
+        profileHandle={user.profile.handle}
         summary={previewData.publicSummary || graph.roadmap.publicSummary || graph.roadmap.summary}
         publishing={publishing}
         publishError={publishError}

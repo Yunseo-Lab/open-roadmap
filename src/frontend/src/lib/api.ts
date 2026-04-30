@@ -115,13 +115,13 @@ export const api = {
     apiRequest<{ profile: PublicProfile; roadmaps: Roadmap[] }>(
       `/api/public/users/${encodeURIComponent(handle)}`,
     ),
-  getPublicRoadmap: (slug: string) =>
+  getPublicRoadmap: (handle: string, slug: string) =>
     apiRequest<{
       profile: PublicProfile | null;
       roadmap: Roadmap;
       graph: RoadmapGraph;
       artifacts: Artifact[];
-    }>(`/api/public/roadmaps/${encodeURIComponent(slug)}`),
+    }>(`/api/public/users/${encodeURIComponent(handle)}/roadmaps/${encodeURIComponent(slug)}`),
 };
 
 async function streamAgentResponse(

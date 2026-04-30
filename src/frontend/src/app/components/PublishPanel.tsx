@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronRight, FileText, Globe } from 'lucide-react';
+import { publicRoadmapPath } from '../../lib/public-links';
 import type { Artifact, PublishRoadmapInput, Roadmap } from '../../types';
 
 interface PublishPanelProps {
@@ -9,6 +10,7 @@ interface PublishPanelProps {
   publishing: boolean;
   publishError: string | null;
   publishedSlug?: string | null;
+  profileHandle: string;
   onToggleCollapse: () => void;
   onPreview: (data: PublishRoadmapInput) => void;
   onPublish: (data: PublishRoadmapInput) => Promise<string | null>;
@@ -21,6 +23,7 @@ export function PublishPanel({
   publishing,
   publishError,
   publishedSlug,
+  profileHandle,
   onToggleCollapse,
   onPreview,
   onPublish,
@@ -123,7 +126,7 @@ export function PublishPanel({
           <div>
             <label className="text-sm block mb-2">URL Slug</label>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">/r/</span>
+              <span className="text-xs text-muted-foreground">/u/{profileHandle}/</span>
               <input
                 type="text"
                 value={publishSlug}
@@ -191,7 +194,7 @@ export function PublishPanel({
 
           {publishedSlug && (
             <a
-              href={`/r/${publishedSlug}`}
+              href={publicRoadmapPath(profileHandle, publishedSlug)}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"

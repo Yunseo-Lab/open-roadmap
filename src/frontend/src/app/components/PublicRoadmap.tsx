@@ -10,7 +10,7 @@ import { FullScreenMessage } from './FullScreenMessage';
 import { ShareRoadmapDialog } from './ShareRoadmapDialog';
 
 export function PublicRoadmap() {
-  const { slug = '' } = useParams();
+  const { handle = '', slug = '' } = useParams();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -21,8 +21,8 @@ export function PublicRoadmap() {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (!slug) {
-      setError('Roadmap slug is required.');
+    if (!handle || !slug) {
+      setError('Profile handle and roadmap slug are required.');
       setLoading(false);
       return;
     }
@@ -32,7 +32,7 @@ export function PublicRoadmap() {
     setError(null);
 
     api
-      .getPublicRoadmap(slug)
+      .getPublicRoadmap(handle, slug)
       .then((data) => {
         if (!isMounted) {
           return;
@@ -58,7 +58,7 @@ export function PublicRoadmap() {
     return () => {
       isMounted = false;
     };
-  }, [slug]);
+  }, [handle, slug]);
 
   if (loading) {
     return <FullScreenMessage title="Open Roadmap" body="Loading public roadmap." />;

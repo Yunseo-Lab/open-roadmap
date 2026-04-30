@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Share2, ExternalLink } from 'lucide-react';
+import { publicRoadmapUrl } from '../../lib/public-links';
 import { GraphViewport } from '../graph/GraphViewport';
 import type { GraphEdge, GraphNode } from '../graph/types';
 import { ShareRoadmapDialog } from './ShareRoadmapDialog';
@@ -12,6 +13,7 @@ interface PublishPreviewProps {
   edges: GraphEdge[];
   title: string;
   slug: string;
+  profileHandle: string;
   summary?: string;
   publishing: boolean;
   publishError: string | null;
@@ -25,6 +27,7 @@ export function PublishPreview({
   edges,
   title,
   slug,
+  profileHandle,
   summary,
   publishing,
   publishError,
@@ -32,7 +35,7 @@ export function PublishPreview({
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   if (!isOpen) return null;
-  const shareUrl = `${window.location.origin}/r/${slug}`;
+  const shareUrl = publicRoadmapUrl(window.location.origin, profileHandle, slug);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -43,7 +46,7 @@ export function PublishPreview({
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
               <span>Preview</span>
               <span>•</span>
-              <span className="text-foreground">open-roadmap.io/r/{slug}</span>
+              <span className="text-foreground">open-roadmap.io/u/{profileHandle}/{slug}</span>
             </div>
             <h2 className="text-xl">{title || 'Untitled Roadmap'}</h2>
             {summary && (

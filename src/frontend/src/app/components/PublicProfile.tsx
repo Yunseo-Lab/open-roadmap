@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Calendar, Target } from 'lucide-react';
 import { api } from '../../lib/api';
+import { publicRoadmapPath } from '../../lib/public-links';
 import type { PublicProfile as PublicProfileData, Roadmap } from '../../types';
 import { FullScreenMessage } from './FullScreenMessage';
 import { ProfileAvatar } from './ProfileAvatar';
@@ -79,7 +80,7 @@ export function PublicProfile() {
               {roadmaps.map((roadmap) => (
                 <Link
                   key={roadmap.id}
-                  to={`/r/${roadmap.slug}`}
+                  to={publicRoadmapPath(profile.handle, roadmap.slug)}
                   className="block p-6 bg-card border border-border rounded-lg hover:border-foreground/20 hover:shadow-lg transition-all"
                 >
                   <div className="flex items-start gap-4">
