@@ -1,5 +1,16 @@
 import type { ArtifactRow, RoadmapRow } from "../types";
 
+const roadmapTableColumns = `
+  roadmaps.id, roadmaps.user_id, roadmaps.title, roadmaps.summary,
+  roadmaps.status, roadmaps.public_title, roadmaps.public_summary,
+  roadmaps.slug, roadmaps.published_at, roadmaps.created_at, roadmaps.updated_at
+`;
+
+const artifactColumns = `
+  id, user_id, roadmap_id, node_id, title, kind, mime_type, original_name,
+  size, r2_key, url, text_content, is_public, created_at
+`;
+
 export type PublicProfileRow = {
   handle: string;
   display_name: string;
@@ -31,7 +42,7 @@ export async function listPublicRoadmapsForHandle(
   const result = await db
     .prepare(
       `SELECT
-         roadmaps.*,
+         ${roadmapTableColumns},
          (
            SELECT COUNT(*)
            FROM roadmap_nodes
@@ -57,7 +68,7 @@ export async function getPublishedRoadmapForHandle(
 ): Promise<RoadmapRow | null> {
   return db
     .prepare(
-      `SELECT roadmaps.*
+      `SELECT ${roadmapTableColumns}
        FROM roadmaps
        JOIN profiles ON profiles.user_id = roadmaps.user_id
        WHERE profiles.handle = ?
@@ -75,7 +86,7 @@ export async function listPublicArtifactsForRoadmap(
 ): Promise<ArtifactRow[]> {
   const result = await db
     .prepare(
-      `SELECT *
+      `SELECT ${artifactColumns}
        FROM artifacts
        WHERE roadmap_id = ? AND is_public = 1
        ORDER BY created_at DESC`,

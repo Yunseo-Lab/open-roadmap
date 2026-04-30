@@ -28,7 +28,6 @@ type EdgeRow = {
 
 // Loads the persisted graph rows and rehydrates them into React Flow-style objects.
 export async function getGraph(db: D1Database, roadmapId: string): Promise<RoadmapGraph> {
-  await ensureDefaultGraphTypes(db, roadmapId);
   const [nodeTypes, edgeTypes] = await Promise.all([
     listGraphTypes(db, roadmapId, "node"),
     listGraphTypes(db, roadmapId, "edge"),
@@ -86,6 +85,16 @@ export async function getGraph(db: D1Database, roadmapId: string): Promise<Roadm
   });
 
   return { nodes, edges, nodeTypes, edgeTypes };
+}
+
+// Guards node attachment so artifacts cannot be linked across roadmaps.
+export async function nodeBelongsToRoadmap(db: D1Database, nodeId: string, roadmapId: string): Promise<boolean> {
+  const node = await db
+    .prepare("SELECT id FROM roadmap_nodes WHERE id = ? AND roadmap_id = ?")
+    .bind(nodeId, roadmapId)
+    .first<{ id: string }>();
+
+  return Boolean(node);
 }
 
 // Replaces the persisted graph in one batch after validating the full input graph.

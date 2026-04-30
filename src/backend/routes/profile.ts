@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { createAuth } from "../auth";
+import { profileHandleExistsForAnotherUser, updateProfile } from "../db/profiles";
 import {
   cleanHandle,
   cleanText,
@@ -32,29 +33,15 @@ profileRoutes.patch("/profile", async (c) => {
   const requestedHandle = cleanHandle(body.handle) || user.profile.handle;
 
   // Handles are public URLs, so uniqueness is checked before updating the profile.
-  const existing = await c.env.DB.prepare(
-    "SELECT user_id FROM profiles WHERE handle = ? AND user_id != ?",
-  )
-    .bind(requestedHandle, user.id)
-    .first<{ user_id: string }>();
-
-  if (existing) {
+  if (await profileHandleExistsForAnotherUser(c.env.DB, requestedHandle, user.id)) {
     conflict("This handle is already in use.");
   }
 
-  await c.env.DB.prepare(
-    `UPDATE profiles
-     SET handle = ?, display_name = ?, bio = ?, updated_at = ?
-     WHERE user_id = ?`,
-  )
-    .bind(requestedHandle, displayName, bio, Date.now(), user.id)
-    .run();
-
-  return c.json({
-    profile: {
-      handle: requestedHandle,
-      displayName,
-      bio,
-    },
+  const profile = await updateProfile(c.env.DB, user.id, {
+    handle: requestedHandle,
+    displayName,
+    bio,
   });
+
+  return c.json({ profile });
 });

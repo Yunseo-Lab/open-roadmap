@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { getArtifactForUser, getPublicArtifact } from "../db/artifacts";
+import { getArtifactForUser, getPublicArtifact, updateArtifactNode } from "../db/artifacts";
+import { nodeBelongsToRoadmap } from "../db/graphs";
 import { toPublicArtifact } from "../db/public-mappers";
 import { getRoadmapForUser } from "../db/roadmaps";
 import {
@@ -7,7 +8,6 @@ import {
   cleanText,
   getOptionalUser,
   getOwnedArtifact,
-  nodeBelongsToRoadmap,
   notFound,
   optionalString,
   optionalFormText,
@@ -90,15 +90,7 @@ artifactRoutes.patch("/artifacts/:id", async (c) => {
     }
   }
 
-  await c.env.DB.prepare(
-    `UPDATE artifacts
-     SET node_id = ?
-     WHERE id = ? AND user_id = ?`,
-  )
-    .bind(nodeId, artifact.id, user.id)
-    .run();
-
-  const updated = await getArtifactForUser(c.env.DB, artifact.id, user.id);
+  const updated = await updateArtifactNode(c.env.DB, artifact.id, user.id, nodeId);
   return c.json({ artifact: updated ? toPublicArtifact(updated) : null });
 });
 

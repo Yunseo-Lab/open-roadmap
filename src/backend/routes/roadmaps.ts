@@ -3,10 +3,16 @@ import { listArtifacts } from "../db/artifacts";
 import { createGraphType, listGraphTypes } from "../db/graph-types";
 import { getGraph, replaceGraph } from "../db/graphs";
 import { toPublicArtifact, toPublicRoadmap } from "../db/public-mappers";
-import { createRoadmap, getRoadmapForUser, listRoadmaps } from "../db/roadmaps";
+import {
+  createRoadmap,
+  createUniqueRoadmapSlug,
+  deleteRoadmapRecords,
+  listRoadmaps,
+  publishRoadmap,
+  updateRoadmapDetails,
+} from "../db/roadmaps";
 import {
   badRequest,
-  cleanHandle,
   cleanText,
   getOwnedRoadmap,
   notFound,
@@ -68,16 +74,8 @@ roadmapRoutes.patch("/roadmaps/:id", async (c) => {
   const body = await readJson(c.req.raw);
   const title = cleanText(body.title, roadmap.title, 120);
   const summary = cleanText(body.summary, roadmap.summary, 1000);
-  const now = Date.now();
-  await c.env.DB.prepare(
-    `UPDATE roadmaps
-     SET title = ?, summary = ?, updated_at = ?
-     WHERE id = ? AND user_id = ?`,
-  )
-    .bind(title, summary, now, roadmap.id, user.id)
-    .run();
 
-  const updated = await getRoadmapForUser(c.env.DB, roadmap.id, user.id);
+  const updated = await updateRoadmapDetails(c.env.DB, roadmap.id, user.id, { title, summary });
   return c.json({ roadmap: updated ? toPublicRoadmap(updated) : null });
 });
 
@@ -93,17 +91,7 @@ roadmapRoutes.delete("/roadmaps/:id", async (c) => {
   const artifactFileKeys = await listArtifactFileKeysForRoadmap(c.env.DB, roadmap.id, user.id);
 
   // D1 is the source of truth; R2 cleanup runs after rows are removed.
-  await c.env.DB.batch([
-    c.env.DB.prepare("DELETE FROM ai_messages WHERE conversation_id IN (SELECT id FROM ai_conversations WHERE roadmap_id = ?)").bind(
-      roadmap.id,
-    ),
-    c.env.DB.prepare("DELETE FROM ai_runs WHERE roadmap_id = ?").bind(roadmap.id),
-    c.env.DB.prepare("DELETE FROM ai_conversations WHERE roadmap_id = ?").bind(roadmap.id),
-    c.env.DB.prepare("DELETE FROM roadmap_edges WHERE roadmap_id = ?").bind(roadmap.id),
-    c.env.DB.prepare("DELETE FROM roadmap_nodes WHERE roadmap_id = ?").bind(roadmap.id),
-    c.env.DB.prepare("DELETE FROM artifacts WHERE roadmap_id = ?").bind(roadmap.id),
-    c.env.DB.prepare("DELETE FROM roadmaps WHERE id = ? AND user_id = ?").bind(roadmap.id, user.id),
-  ]);
+  await deleteRoadmapRecords(c.env.DB, roadmap.id, user.id);
   await deleteArtifactFiles(c.env, artifactFileKeys, { roadmapId: roadmap.id, userId: user.id });
 
   return c.json({ ok: true });
@@ -196,52 +184,11 @@ roadmapRoutes.post("/roadmaps/:id/publish", async (c) => {
   const slug = await createUniqueRoadmapSlug(c.env.DB, roadmap.id, user.id, slugSource);
   const publicArtifactIds = stringArray(body.artifactIds);
 
-  // Reset all artifact visibility first, then opt selected artifacts back in.
-  const statements: D1PreparedStatement[] = [
-    c.env.DB.prepare(
-      `UPDATE roadmaps
-       SET status = 'published', public_title = ?, public_summary = ?, slug = ?, published_at = ?, updated_at = ?
-       WHERE id = ? AND user_id = ?`,
-    ).bind(publicTitle, publicSummary, slug, Date.now(), Date.now(), roadmap.id, user.id),
-    c.env.DB.prepare("UPDATE artifacts SET is_public = 0 WHERE roadmap_id = ? AND user_id = ?").bind(
-      roadmap.id,
-      user.id,
-    ),
-  ];
-
-  for (const artifactId of publicArtifactIds) {
-    statements.push(
-      c.env.DB.prepare(
-        "UPDATE artifacts SET is_public = 1 WHERE id = ? AND roadmap_id = ? AND user_id = ?",
-      ).bind(artifactId, roadmap.id, user.id),
-    );
-  }
-
-  await c.env.DB.batch(statements);
-  const updated = await getRoadmapForUser(c.env.DB, roadmap.id, user.id);
+  const updated = await publishRoadmap(c.env.DB, roadmap.id, user.id, {
+    publicTitle,
+    publicSummary,
+    slug,
+    artifactIds: publicArtifactIds,
+  });
   return c.json({ roadmap: updated ? toPublicRoadmap(updated) : null });
 });
-
-// Slugs only need to be unique within one user's public roadmap namespace.
-async function createUniqueRoadmapSlug(
-  db: D1Database,
-  roadmapId: string,
-  userId: string,
-  source: string,
-): Promise<string> {
-  const base = cleanHandle(source) || `roadmap-${roadmapId.slice(0, 8)}`;
-
-  for (let index = 0; index < 40; index += 1) {
-    const slug = index === 0 ? base : `${base}-${index + 1}`;
-    const existing = await db
-      .prepare("SELECT id FROM roadmaps WHERE slug = ? AND user_id = ? AND id != ?")
-      .bind(slug, userId, roadmapId)
-      .first<{ id: string }>();
-
-    if (!existing) {
-      return slug;
-    }
-  }
-
-  return `${base}-${crypto.randomUUID().slice(0, 6)}`;
-}
