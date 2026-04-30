@@ -45,7 +45,7 @@ def _run_langchain_agent(runtime: GraphToolRuntime, model: Any) -> RoadmapAgentR
     agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT)
     try:
         result = agent.invoke(
-            {"messages": [{"role": "user", "content": runtime.request.message}]},
+            {"messages": _agent_messages(runtime.request)},
             config={"recursion_limit": _agent_recursion_limit()},
         )
     except Exception as error:
@@ -55,6 +55,25 @@ def _run_langchain_agent(runtime: GraphToolRuntime, model: Any) -> RoadmapAgentR
 
     summary = _last_message_text(result) or "Processed the roadmap request."
     return _response_from_runtime(runtime, summary=summary, model_name="python-langchain-openrouter")
+
+
+def _agent_messages(request: RoadmapAgentRequest) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = []
+    if request.conversationSummary and request.conversationSummary.strip():
+        messages.append(
+            {
+                "role": "system",
+                "content": f"Conversation summary so far: {request.conversationSummary.strip()}",
+            }
+        )
+
+    for item in request.history:
+        content = item.content.strip()
+        if content:
+            messages.append({"role": item.role, "content": content})
+
+    messages.append({"role": "user", "content": request.message})
+    return messages
 
 
 def _run_deterministic_agent(runtime: GraphToolRuntime) -> RoadmapAgentResponse:

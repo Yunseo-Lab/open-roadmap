@@ -13,7 +13,13 @@ import { RoadmapDeleteDialog } from './RoadmapDeleteDialog';
 import { useAuth } from '../auth/AuthProvider';
 import { useWorkspaceGraph } from '../graph/useWorkspaceGraph';
 import { api } from '../../lib/api';
-import type { AgentResponse, PublishRoadmapInput, Roadmap } from '../../types';
+import type {
+  AgentConversation,
+  AgentConversationMessage,
+  AgentResponse,
+  PublishRoadmapInput,
+  Roadmap,
+} from '../../types';
 import type { AgentStreamHandlers } from '../../lib/api';
 
 export function Workspace() {
@@ -37,6 +43,12 @@ export function Workspace() {
   const [deletingRoadmap, setDeletingRoadmap] = useState<Roadmap | null>(null);
   const [deletingRoadmapId, setDeletingRoadmapId] = useState<string | null>(null);
   const [deleteRoadmapError, setDeleteRoadmapError] = useState<string | null>(null);
+  const [agentConversations, setAgentConversations] = useState<AgentConversation[]>([]);
+  const [selectedAgentConversationId, setSelectedAgentConversationId] = useState<string | null>(null);
+  const [agentMessages, setAgentMessages] = useState<AgentConversationMessage[]>([]);
+  const [isLoadingAgentConversations, setIsLoadingAgentConversations] = useState(false);
+  const [isLoadingAgentMessages, setIsLoadingAgentMessages] = useState(false);
+  const [agentHistoryError, setAgentHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedRoadmap) {
@@ -47,6 +59,75 @@ export function Workspace() {
   useEffect(() => {
     setIsEditPanelCollapsed(true);
   }, [selectedRoadmap]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAgentConversations([]);
+    setSelectedAgentConversationId(null);
+    setAgentMessages([]);
+    setAgentHistoryError(null);
+
+    if (!selectedRoadmap) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setIsLoadingAgentConversations(true);
+    api.listAgentConversations(selectedRoadmap)
+      .then((data) => {
+        if (cancelled) return;
+        setAgentConversations(data.conversations);
+        setSelectedAgentConversationId(data.conversations[0]?.id ?? null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setAgentHistoryError(error instanceof Error ? error.message : 'Unable to load agent chats.');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingAgentConversations(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRoadmap]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedRoadmap || !selectedAgentConversationId) {
+      setAgentMessages([]);
+      setIsLoadingAgentMessages(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setIsLoadingAgentMessages(true);
+    setAgentHistoryError(null);
+    setAgentMessages([]);
+    api.getAgentConversationMessages(selectedRoadmap, selectedAgentConversationId)
+      .then((data) => {
+        if (cancelled) return;
+        setAgentMessages(data.messages);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setAgentHistoryError(error instanceof Error ? error.message : 'Unable to load agent messages.');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingAgentMessages(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRoadmap, selectedAgentConversationId]);
 
   const openEditPanel = useCallback(() => {
     setIsEditPanelCollapsed(false);
@@ -107,7 +188,43 @@ export function Workspace() {
     }
   }, [graph, selectedRoadmap]);
 
+  const refreshAgentConversation = useCallback(async (conversationId: string) => {
+    if (!selectedRoadmap) {
+      return;
+    }
+
+    const [conversationData, messagesData] = await Promise.all([
+      api.listAgentConversations(selectedRoadmap),
+      api.getAgentConversationMessages(selectedRoadmap, conversationId),
+    ]);
+    setAgentConversations(conversationData.conversations);
+    setAgentMessages(messagesData.messages);
+    setSelectedAgentConversationId(conversationId);
+  }, [selectedRoadmap]);
+
+  const handleCreateAgentConversation = useCallback(async () => {
+    if (!selectedRoadmap) {
+      return null;
+    }
+
+    try {
+      setAgentHistoryError(null);
+      const data = await api.createAgentConversation(selectedRoadmap);
+      setAgentConversations((current) => [
+        data.conversation,
+        ...current.filter((conversation) => conversation.id !== data.conversation.id),
+      ]);
+      setSelectedAgentConversationId(data.conversation.id);
+      setAgentMessages([]);
+      return data.conversation.id;
+    } catch (error) {
+      setAgentHistoryError(error instanceof Error ? error.message : 'Unable to create an agent chat.');
+      return null;
+    }
+  }, [selectedRoadmap]);
+
   const handleAgentMessage = useCallback(async (
+    conversationId: string,
     message: string,
     handlers: AgentStreamHandlers,
   ): Promise<AgentResponse> => {
@@ -115,12 +232,18 @@ export function Workspace() {
       throw new Error('Roadmap is required.');
     }
 
-    handlers.onStatus?.('Saving current graph.');
-    await graph.ensureGraphSaved();
-    const result = await api.runAgentStream(selectedRoadmap, { content: message, artifactIds: [] }, handlers);
-    graph.applyServerGraph(result.graph);
-    return result;
-  }, [graph, selectedRoadmap]);
+    try {
+      handlers.onStatus?.('Saving current graph.');
+      await graph.ensureGraphSaved();
+      const result = await api.runAgentStream(selectedRoadmap, conversationId, { content: message, artifactIds: [] }, handlers);
+      graph.applyServerGraph(result.graph);
+      await refreshAgentConversation(conversationId);
+      return result;
+    } catch (error) {
+      await refreshAgentConversation(conversationId).catch(() => undefined);
+      throw error;
+    }
+  }, [graph, refreshAgentConversation, selectedRoadmap]);
 
   function openDeleteRoadmapDialog(roadmap: Roadmap) {
     setDeletingRoadmap(roadmap);
@@ -224,7 +347,19 @@ export function Workspace() {
         <AccountButton user={user} onSignOut={signOut} />
       </div>
 
-      <AIChat isOpen={true} disabled={graph.isSaving} onSend={handleAgentMessage} />
+      <AIChat
+        isOpen={true}
+        disabled={graph.isSaving}
+        conversations={agentConversations}
+        selectedConversationId={selectedAgentConversationId}
+        messages={agentMessages}
+        isLoadingConversations={isLoadingAgentConversations}
+        isLoadingMessages={isLoadingAgentMessages}
+        historyError={agentHistoryError}
+        onSelectConversation={setSelectedAgentConversationId}
+        onCreateConversation={handleCreateAgentConversation}
+        onSend={handleAgentMessage}
+      />
 
       <PublishPreview
         isOpen={isPreviewOpen}

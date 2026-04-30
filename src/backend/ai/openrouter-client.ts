@@ -4,7 +4,7 @@ import { buildUserContent, type ArtifactPromptPart, type OpenRouterContentPart }
 import { applyToolCall, describeTypes, parseToolArguments } from "./graph-tools";
 import { readResponsePreview } from "./response-preview";
 import { roadmapTools } from "./tool-schema";
-import type { AgentOperation, AgentResult } from "./types";
+import type { AgentHistoryMessage, AgentOperation, AgentResult } from "./types";
 
 type OpenRouterMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -27,6 +27,10 @@ export async function callOpenRouterAgent(
   startingGraph: RoadmapGraph,
   message: string,
   artifacts: ArtifactPromptPart[],
+  context: {
+    history: AgentHistoryMessage[];
+    conversationSummary: string | null;
+  },
 ): Promise<AgentResult> {
   const model = env.OPENROUTER_MODEL || "openai/gpt-4.1-mini";
   const draft: RoadmapGraph = structuredClone(startingGraph);
@@ -43,6 +47,7 @@ export async function callOpenRouterAgent(
         `Current edge types: ${describeTypes(startingGraph.edgeTypes)}. ` +
         "After tool calls, respond with a one or two sentence summary in English.",
     },
+    ...conversationContextMessages(context),
     {
       role: "user",
       content: userContent,
@@ -129,4 +134,26 @@ export async function callOpenRouterAgent(
     operations,
     model,
   };
+}
+
+function conversationContextMessages(context: {
+  history: AgentHistoryMessage[];
+  conversationSummary: string | null;
+}): OpenRouterMessage[] {
+  const messages: OpenRouterMessage[] = [];
+  if (context.conversationSummary) {
+    messages.push({
+      role: "system",
+      content: `Conversation summary so far: ${context.conversationSummary}`,
+    });
+  }
+
+  for (const item of context.history) {
+    messages.push({
+      role: item.role,
+      content: item.content,
+    });
+  }
+
+  return messages;
 }

@@ -19,12 +19,12 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from './ui/utils';
-import type { AgentOperation, AgentResponse } from '../../types';
+import type { AgentConversation, AgentConversationMessage, AgentOperation, AgentResponse } from '../../types';
 import type { AgentStreamHandlers } from '../../lib/api';
 
 type RunStatus = 'running' | 'completed' | 'error';
 
-type TranscriptRun = {
+export type TranscriptRun = {
   id: string;
   userMessage: string;
   createdAt: number;
@@ -40,10 +40,30 @@ type TranscriptRun = {
 interface AIChatProps {
   isOpen: boolean;
   disabled?: boolean;
-  onSend?: (message: string, handlers: AgentStreamHandlers) => Promise<AgentResponse>;
+  conversations?: AgentConversation[];
+  selectedConversationId?: string | null;
+  messages?: AgentConversationMessage[];
+  isLoadingConversations?: boolean;
+  isLoadingMessages?: boolean;
+  historyError?: string | null;
+  onSelectConversation?: (conversationId: string) => void;
+  onCreateConversation?: () => Promise<string | null>;
+  onSend?: (conversationId: string, message: string, handlers: AgentStreamHandlers) => Promise<AgentResponse>;
 }
 
-export function AIChat({ isOpen, disabled = false, onSend }: AIChatProps) {
+export function AIChat({
+  isOpen,
+  disabled = false,
+  conversations = [],
+  selectedConversationId = null,
+  messages = [],
+  isLoadingConversations = false,
+  isLoadingMessages = false,
+  historyError = null,
+  onSelectConversation,
+  onCreateConversation,
+  onSend,
+}: AIChatProps) {
   const [input, setInput] = useState('');
   const [runs, setRuns] = useState<TranscriptRun[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -65,6 +85,12 @@ export function AIChat({ isOpen, disabled = false, onSend }: AIChatProps) {
       endRef.current?.scrollIntoView({ block: 'end' });
     }
   }, [runs]);
+
+  useEffect(() => {
+    if (!isSending) {
+      setRuns(runsFromConversationMessages(messages));
+    }
+  }, [isSending, messages, selectedConversationId]);
 
   const updateAutoScrollPreference = () => {
     const body = transcriptBodyRef.current;
@@ -121,7 +147,15 @@ export function AIChat({ isOpen, disabled = false, onSend }: AIChatProps) {
     };
 
     try {
-      const result = await onSend(message, handlers);
+      let conversationId = selectedConversationId;
+      if (!conversationId) {
+        conversationId = (await onCreateConversation?.()) ?? null;
+      }
+      if (!conversationId) {
+        throw new Error('Unable to create an agent chat.');
+      }
+
+      const result = await onSend(conversationId, message, handlers);
       updateRun(runId, (run) => ({
         ...run,
         status: 'completed',
@@ -147,8 +181,11 @@ export function AIChat({ isOpen, disabled = false, onSend }: AIChatProps) {
 
   if (!isOpen) return null;
 
+  const selectedConversation = conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
   const runningCount = runs.filter((run) => run.status === 'running').length;
-  const shouldShowTranscript = runs.length > 0 || isSending;
+  const shouldShowTranscript =
+    conversations.length > 0 || runs.length > 0 || isSending || isLoadingConversations || isLoadingMessages || Boolean(historyError);
+  const canSend = Boolean(onSend) && (Boolean(selectedConversationId) || Boolean(onCreateConversation));
 
   return (
     <>
@@ -173,9 +210,9 @@ export function AIChat({ isOpen, disabled = false, onSend }: AIChatProps) {
                 <Bot className="size-4" />
               </div>
               <div className="min-w-0">
-                <h2 className="truncate text-sm font-medium">Agent history</h2>
+                <h2 className="truncate text-sm font-medium">{selectedConversation?.title || 'Agent history'}</h2>
                 <p className="truncate text-xs text-muted-foreground">
-                  {isSending ? 'Running' : `${runs.length} run${runs.length === 1 ? '' : 's'}`}
+                  {isSending ? 'Running' : `${conversations.length || 1} chat${conversations.length === 1 ? '' : 's'}`}
                 </p>
               </div>
             </div>
@@ -184,12 +221,12 @@ export function AIChat({ isOpen, disabled = false, onSend }: AIChatProps) {
                 type="button"
                 variant="ghost"
                 size="icon"
-                title="Clear transcript"
-                disabled={!runs.length || isSending}
-                onClick={() => setRuns([])}
+                title="New chat"
+                disabled={isSending || disabled || !onCreateConversation}
+                onClick={() => void onCreateConversation?.()}
                 className="size-8"
               >
-                <Trash2 className="size-4" />
+                <Plus className="size-4" />
               </Button>
               <Button
                 type="button"
@@ -204,12 +241,51 @@ export function AIChat({ isOpen, disabled = false, onSend }: AIChatProps) {
             </div>
           </header>
 
+          {conversations.length > 0 && (
+            <div className="flex flex-shrink-0 gap-1 overflow-x-auto border-b border-border px-3 py-2">
+              {conversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  disabled={isSending}
+                  onClick={() => onSelectConversation?.(conversation.id)}
+                  className={cn(
+                    'max-w-44 flex-shrink-0 truncate rounded px-2.5 py-1.5 text-left text-xs transition-colors disabled:opacity-50',
+                    conversation.id === selectedConversationId
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:text-foreground',
+                  )}
+                  title={conversation.title}
+                >
+                  {conversation.title}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div
             ref={transcriptBodyRef}
             onScroll={updateAutoScrollPreference}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
           >
             <div className="max-w-full space-y-3 p-3">
+              {(isLoadingConversations || isLoadingMessages) && (
+                <div className="flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>Loading agent history</span>
+                </div>
+              )}
+              {historyError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {historyError}
+                </div>
+              )}
+              {!isLoadingConversations && !isLoadingMessages && !historyError && conversations.length === 0 && runs.length === 0 && (
+                <div className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">No agent chats yet.</div>
+              )}
+              {!isLoadingMessages && !historyError && conversations.length > 0 && runs.length === 0 && (
+                <div className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">No messages in this chat yet.</div>
+              )}
               {runs.map((run) => <RunCard key={run.id} run={run} />)}
               <div ref={endRef} />
             </div>
@@ -260,7 +336,7 @@ export function AIChat({ isOpen, disabled = false, onSend }: AIChatProps) {
             </div>
             <button
               type="submit"
-              disabled={!input.trim() || disabled || isSending || !onSend}
+              disabled={!input.trim() || disabled || isSending || !canSend}
               className="flex-shrink-0 rounded-full bg-foreground p-1.5 text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
               title={isSending ? 'Running agent' : 'Send'}
             >
@@ -318,6 +394,76 @@ function RunCard({ run }: { run: TranscriptRun }) {
       </div>
     </article>
   );
+}
+
+export function runsFromConversationMessages(messages: AgentConversationMessage[]): TranscriptRun[] {
+  const runs: TranscriptRun[] = [];
+  let pendingUser: AgentConversationMessage | null = null;
+
+  for (const message of messages) {
+    if (message.role === 'user') {
+      if (pendingUser) {
+        runs.push(runFromMessages(pendingUser, null));
+      }
+      pendingUser = message;
+    }
+
+    if (message.role === 'assistant') {
+      if (pendingUser) {
+        runs.push(runFromMessages(pendingUser, message));
+        pendingUser = null;
+      }
+    }
+  }
+
+  if (pendingUser) {
+    runs.push(runFromMessages(pendingUser, null));
+  }
+
+  return runs;
+}
+
+function runFromMessages(userMessage: AgentConversationMessage, assistantMessage: AgentConversationMessage | null): TranscriptRun {
+  const metadata = assistantMessage?.metadata ?? {};
+  const error = stringField(metadata, 'error');
+  return {
+    id: `${userMessage.id}-${assistantMessage?.id ?? 'pending'}`,
+    userMessage: userMessage.content,
+    createdAt: userMessage.createdAt,
+    status: error ? 'error' : assistantMessage ? 'completed' : 'running',
+    statusMessages: assistantMessage ? [] : ['Waiting for assistant response.'],
+    operations: operationsFromMetadata(metadata),
+    summary: error ? null : assistantMessage?.content ?? null,
+    error: error || null,
+    responseType: responseTypeFromMetadata(metadata),
+    committed: booleanField(metadata, 'committed') ?? undefined,
+  };
+}
+
+function operationsFromMetadata(metadata: Record<string, unknown>): AgentOperation[] {
+  const operations = metadata.operations;
+  if (!Array.isArray(operations)) {
+    return [];
+  }
+
+  return operations.filter((operation): operation is AgentOperation => {
+    return Boolean(operation) && typeof operation === 'object' && typeof (operation as AgentOperation).tool === 'string';
+  });
+}
+
+function responseTypeFromMetadata(metadata: Record<string, unknown>): AgentResponse['responseType'] {
+  const responseType = stringField(metadata, 'responseType');
+  if (
+    responseType === 'answer' ||
+    responseType === 'graph_update' ||
+    responseType === 'answer_and_graph_update' ||
+    responseType === 'clarification' ||
+    responseType === 'approval_required' ||
+    responseType === 'error'
+  ) {
+    return responseType;
+  }
+  return undefined;
 }
 
 export function MarkdownContent({ content }: { content: string }) {

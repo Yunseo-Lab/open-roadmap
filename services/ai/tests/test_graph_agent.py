@@ -4,6 +4,7 @@ import unittest
 from app.graph_agent.graph_tools import GraphToolRuntime
 from app.graph_agent.workflow import (
     _agent_recursion_limit,
+    _agent_messages,
     _openrouter_response_text_detail,
     _response_from_runtime,
     run_graph_agent,
@@ -163,6 +164,35 @@ class GraphAgentTests(unittest.TestCase):
 
         os.environ["AGENT_RECURSION_LIMIT"] = "6"
         self.assertEqual(_agent_recursion_limit(), 12)
+
+    def test_agent_messages_include_conversation_context(self) -> None:
+        request = RoadmapAgentRequest(
+            userId="user-1",
+            roadmapId="roadmap-1",
+            conversationId="conversation-1",
+            conversationSummary="The user is planning backend growth.",
+            history=[
+                {"role": "user", "content": "Hi", "metadata": {}, "createdAt": 1},
+                {"role": "assistant", "content": "Hello, how can I help?", "metadata": {}, "createdAt": 2},
+            ],
+            message="What did I ask before?",
+            artifactIds=[],
+            artifacts=[],
+            graph=_seeded_graph(),
+        )
+
+        self.assertEqual(
+            _agent_messages(request),
+            [
+                {
+                    "role": "system",
+                    "content": "Conversation summary so far: The user is planning backend growth.",
+                },
+                {"role": "user", "content": "Hi"},
+                {"role": "assistant", "content": "Hello, how can I help?"},
+                {"role": "user", "content": "What did I ask before?"},
+            ],
+        )
 
 
 def _request(message: str, graph: RoadmapGraph) -> RoadmapAgentRequest:

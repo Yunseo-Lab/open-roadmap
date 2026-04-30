@@ -1,5 +1,7 @@
 import type {
   Artifact,
+  AgentConversation,
+  AgentConversationMessage,
   AgentOperation,
   AgentResponse,
   CreateRoadmapInput,
@@ -85,13 +87,33 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ graph }),
     }),
-  runAgent: (id: string, body: { content: string; artifactIds?: string[] }) =>
+  listAgentConversations: (id: string) =>
+    apiRequest<{ conversations: AgentConversation[] }>(`/api/roadmaps/${id}/agent/conversations`),
+  createAgentConversation: (id: string, body: { title?: string } = {}) =>
+    apiRequest<{ conversation: AgentConversation }>(`/api/roadmaps/${id}/agent/conversations`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getAgentConversationMessages: (id: string, conversationId: string) =>
+    apiRequest<{ conversation: AgentConversation; messages: AgentConversationMessage[] }>(
+      `/api/roadmaps/${id}/agent/conversations/${conversationId}/messages`,
+    ),
+  runAgent: (id: string, body: { content: string; artifactIds?: string[]; conversationId?: string }) =>
     apiRequest<AgentResponse>(`/api/roadmaps/${id}/agent/messages`, {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  runAgentStream: (id: string, body: { content: string; artifactIds?: string[] }, handlers: AgentStreamHandlers = {}) =>
-    streamAgentResponse(`/api/roadmaps/${id}/agent/messages/stream`, body, handlers),
+  runAgentStream: (
+    id: string,
+    conversationId: string,
+    body: { content: string; artifactIds?: string[] },
+    handlers: AgentStreamHandlers = {},
+  ) =>
+    streamAgentResponse(
+      `/api/roadmaps/${id}/agent/conversations/${conversationId}/messages/stream`,
+      body,
+      handlers,
+    ),
   publishRoadmap: (id: string, body: PublishRoadmapInput) =>
     apiRequest<{ roadmap: Roadmap | null }>(`/api/roadmaps/${id}/publish`, {
       method: "POST",

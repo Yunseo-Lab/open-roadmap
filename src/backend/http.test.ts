@@ -4,6 +4,7 @@ import {
   optionalString,
   readJson,
   requiredCleanText,
+  responseStatusFromError,
   stringArray,
 } from "./http";
 
@@ -29,6 +30,23 @@ describe("readJson", () => {
       status: 400,
       message: "Request body must be a JSON object.",
     } satisfies Partial<HttpError>);
+  });
+});
+
+describe("responseStatusFromError", () => {
+  it("preserves safe HttpError statuses", () => {
+    expect(responseStatusFromError(new HttpError(404, "Missing."))).toBe(404);
+  });
+
+  it("preserves selected upstream service statuses", () => {
+    expect(responseStatusFromError({ statusCode: 429 })).toBe(429);
+    expect(responseStatusFromError({ statusCode: 502 })).toBe(502);
+    expect(responseStatusFromError({ statusCode: 503 })).toBe(503);
+  });
+
+  it("hides unknown statuses behind 500", () => {
+    expect(responseStatusFromError({ statusCode: 418 })).toBe(500);
+    expect(responseStatusFromError(new Error("boom"))).toBe(500);
   });
 });
 

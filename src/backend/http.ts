@@ -1,8 +1,8 @@
 import type { Context } from "hono";
 import { getCurrentUser, slugify } from "./auth";
+import type { AppEnv, CurrentUser, JsonRecord } from "./types";
 import { getArtifactForUser } from "./db/artifacts";
 import { getRoadmapForUser } from "./db/roadmaps";
-import type { AppEnv, CurrentUser, JsonRecord } from "./types";
 
 // Hono receives the Cloudflare Worker bindings through this typed context.
 export type AppBindings = {
@@ -12,6 +12,7 @@ export type AppBindings = {
 export type AppContext = Context<AppBindings>;
 
 type HttpErrorStatus = 400 | 401 | 404 | 409;
+export type ApiErrorStatus = HttpErrorStatus | 403 | 429 | 500 | 502 | 503;
 
 // Route helpers throw this for expected client errors; the app-level error
 // handler converts it back into a JSON response without logging it as a 500.
@@ -39,6 +40,22 @@ export function unauthorized(message = "Authentication required."): never {
 
 export function notFound(message = "Not found."): never {
   throw new HttpError(404, message);
+}
+
+// Preserves explicit upstream retry/service statuses while treating unknown failures as 500.
+export function responseStatusFromError(error: unknown): ApiErrorStatus {
+  if (error instanceof HttpError) {
+    return error.status;
+  }
+
+  if (error && typeof error === "object") {
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    if (statusCode === 429 || statusCode === 502 || statusCode === 503) {
+      return statusCode;
+    }
+  }
+
+  return 500;
 }
 
 // Use this for endpoints that can work for both signed-in and public visitors.
@@ -74,16 +91,6 @@ export async function getOwnedArtifact(c: AppContext, user: CurrentUser) {
   }
 
   return getArtifactForUser(c.env.DB, id, user.id);
-}
-
-// Guards node attachment so artifacts cannot be linked across roadmaps.
-export async function nodeBelongsToRoadmap(db: D1Database, nodeId: string, roadmapId: string) {
-  const node = await db
-    .prepare("SELECT id FROM roadmap_nodes WHERE id = ? AND roadmap_id = ?")
-    .bind(nodeId, roadmapId)
-    .first<{ id: string }>();
-
-  return Boolean(node);
 }
 
 // Parses optional JSON bodies, but rejects malformed or non-object JSON clearly.

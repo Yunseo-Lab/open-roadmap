@@ -109,6 +109,23 @@ export type AgentResponse = {
   riskFlags?: Record<string, unknown>[];
   validationReport?: Record<string, unknown> | null;
   approvalRequest?: Record<string, unknown> | null;
+  conversation?: AgentConversation;
+};
+
+export type AgentConversation = {
+  id: string;
+  title: string;
+  summary: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type AgentConversationMessage = {
+  id: string;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  metadata: Record<string, unknown>;
+  createdAt: number;
 };
 
 export type Artifact = {

@@ -1,5 +1,12 @@
 import type { AppEnv, JsonRecord, RoadmapGraph } from "../types";
 
+export type AgentHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+  metadata: JsonRecord;
+  createdAt: number;
+};
+
 export type AgentResult = {
   graph: RoadmapGraph;
   summary: string;
@@ -28,6 +35,9 @@ export type AgentInput = {
   db: D1Database;
   userId: string;
   roadmapId: string;
+  conversationId: string;
   message: string;
   artifactIds: string[];
+  history: AgentHistoryMessage[];
+  conversationSummary: string | null;
 };

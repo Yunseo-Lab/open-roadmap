@@ -64,10 +64,20 @@ class ArtifactSummary(BaseModel):
     fileUrl: str | None = None
 
 
+class ChatHistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    createdAt: int | None = None
+
+
 class RoadmapAgentRequest(BaseModel):
     userId: str
     roadmapId: str
+    conversationId: str | None = None
     message: str
+    history: list[ChatHistoryMessage] = Field(default_factory=list)
+    conversationSummary: str | None = None
     artifactIds: list[str] = Field(default_factory=list)
     artifacts: list[ArtifactSummary] = Field(default_factory=list)
     graph: RoadmapGraph

@@ -21,7 +21,10 @@ export async function runRoadmapAgent(input: AgentInput): Promise<AgentResult> {
   }
 
   try {
-    const result = await callOpenRouterAgent(input.env, graph, input.message, artifacts);
+    const result = await callOpenRouterAgent(input.env, graph, input.message, artifacts, {
+      history: input.history,
+      conversationSummary: input.conversationSummary,
+    });
     return persistAgentResult(input.db, input.roadmapId, result);
   } catch (error) {
     if (input.env.APP_ENV === "production") {
