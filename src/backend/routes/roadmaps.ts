@@ -1,44 +1,36 @@
 import { Hono } from "hono";
+import { listArtifacts } from "../db/artifacts";
+import { createGraphType, listGraphTypes } from "../db/graph-types";
+import { getGraph, replaceGraph } from "../db/graphs";
+import { toPublicArtifact, toPublicRoadmap } from "../db/public-mappers";
+import { createRoadmap, getRoadmapForUser, listRoadmaps } from "../db/roadmaps";
 import {
-  createGraphType,
-  createRoadmap,
-  getGraph,
-  getRoadmapForUser,
-  listArtifacts,
-  listGraphTypes,
-  listRoadmaps,
-  replaceGraph,
-  toPublicArtifact,
-  toPublicRoadmap,
-} from "../db/queries";
-import {
+  badRequest,
   cleanHandle,
   cleanText,
   getOwnedRoadmap,
   notFound,
+  optionalString,
   readJson,
+  requiredCleanText,
   requireUser,
-  unauthorized,
+  stringArray,
   type AppBindings,
 } from "../http";
-import { deleteArtifactFilesForRoadmap } from "../services/artifacts";
+import { deleteArtifactFiles, listArtifactFileKeysForRoadmap } from "../services/artifacts";
 
 export const roadmapRoutes = new Hono<AppBindings>();
 
+// Lists the current user's roadmaps, already shaped for the frontend API.
 roadmapRoutes.get("/roadmaps", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   return c.json({ roadmaps: await listRoadmaps(c.env.DB, user.id) });
 });
 
+// Creates the roadmap shell and seeds default graph type definitions.
 roadmapRoutes.post("/roadmaps", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const body = await readJson(c.req.raw);
   const title = cleanText(body.title, "New Roadmap", 120);
@@ -48,15 +40,13 @@ roadmapRoutes.post("/roadmaps", async (c) => {
   return c.json({ roadmap: roadmap ? toPublicRoadmap(roadmap) : null }, 201);
 });
 
+// Returns one owned roadmap with its artifact sidebar data.
 roadmapRoutes.get("/roadmaps/:id", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const roadmap = await getOwnedRoadmap(c, user);
   if (!roadmap) {
-    return notFound(c);
+    return notFound();
   }
 
   const artifacts = await listArtifacts(c.env.DB, user.id, roadmap.id);
@@ -66,15 +56,13 @@ roadmapRoutes.get("/roadmaps/:id", async (c) => {
   });
 });
 
+// Updates only user-editable roadmap summary fields.
 roadmapRoutes.patch("/roadmaps/:id", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const roadmap = await getOwnedRoadmap(c, user);
   if (!roadmap) {
-    return notFound(c);
+    return notFound();
   }
 
   const body = await readJson(c.req.raw);
@@ -93,18 +81,18 @@ roadmapRoutes.patch("/roadmaps/:id", async (c) => {
   return c.json({ roadmap: updated ? toPublicRoadmap(updated) : null });
 });
 
+// Deletes dependent data explicitly before removing the roadmap row.
 roadmapRoutes.delete("/roadmaps/:id", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const roadmap = await getOwnedRoadmap(c, user);
   if (!roadmap) {
-    return notFound(c);
+    return notFound();
   }
 
-  await deleteArtifactFilesForRoadmap(c.env, roadmap.id, user.id);
+  const artifactFileKeys = await listArtifactFileKeysForRoadmap(c.env.DB, roadmap.id, user.id);
+
+  // D1 is the source of truth; R2 cleanup runs after rows are removed.
   await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM ai_messages WHERE conversation_id IN (SELECT id FROM ai_conversations WHERE roadmap_id = ?)").bind(
       roadmap.id,
@@ -116,33 +104,30 @@ roadmapRoutes.delete("/roadmaps/:id", async (c) => {
     c.env.DB.prepare("DELETE FROM artifacts WHERE roadmap_id = ?").bind(roadmap.id),
     c.env.DB.prepare("DELETE FROM roadmaps WHERE id = ? AND user_id = ?").bind(roadmap.id, user.id),
   ]);
+  await deleteArtifactFiles(c.env, artifactFileKeys, { roadmapId: roadmap.id, userId: user.id });
 
   return c.json({ ok: true });
 });
 
+// Graph loading is ownership-gated by the roadmap lookup above.
 roadmapRoutes.get("/roadmaps/:id/graph", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const roadmap = await getOwnedRoadmap(c, user);
   if (!roadmap) {
-    return notFound(c);
+    return notFound();
   }
 
   return c.json({ graph: await getGraph(c.env.DB, roadmap.id) });
 });
 
+// Replaces the whole graph snapshot after shared graph validation/normalization.
 roadmapRoutes.patch("/roadmaps/:id/graph", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const roadmap = await getOwnedRoadmap(c, user);
   if (!roadmap) {
-    return notFound(c);
+    return notFound();
   }
 
   const body = await readJson(c.req.raw);
@@ -150,19 +135,17 @@ roadmapRoutes.patch("/roadmaps/:id/graph", async (c) => {
     const graph = await replaceGraph(c.env.DB, roadmap.id, body.graph ?? body);
     return c.json({ graph });
   } catch (error) {
-    return c.json({ error: error instanceof Error ? error.message : "Failed to save graph." }, 400);
+    badRequest(error instanceof Error ? error.message : "Failed to save graph.");
   }
 });
 
+// Node and edge type definitions are listed together for the graph editor.
 roadmapRoutes.get("/roadmaps/:id/types", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const roadmap = await getOwnedRoadmap(c, user);
   if (!roadmap) {
-    return notFound(c);
+    return notFound();
   }
 
   const [nodeTypes, edgeTypes] = await Promise.all([
@@ -173,54 +156,47 @@ roadmapRoutes.get("/roadmaps/:id/types", async (c) => {
   return c.json({ nodeTypes, edgeTypes });
 });
 
+// Adds a custom node or edge type scoped to this roadmap.
 roadmapRoutes.post("/roadmaps/:id/types", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const roadmap = await getOwnedRoadmap(c, user);
   if (!roadmap) {
-    return notFound(c);
+    return notFound();
   }
 
   const body = await readJson(c.req.raw);
-  const scope = body.scope === "edge" ? "edge" : "node";
-  const name = cleanText(body.name, "", 40);
-  if (!name) {
-    return c.json({ error: "Type name is required." }, 400);
-  }
+  const scope = optionalString(body.scope) === "edge" ? "edge" : "node";
+  const name = requiredCleanText(body.name, "Type name is required.", 40);
 
   const type = await createGraphType(c.env.DB, roadmap.id, scope, {
-    id: typeof body.id === "string" ? body.id : undefined,
+    id: optionalString(body.id),
     name,
-    description: typeof body.description === "string" ? body.description : "",
-    color: typeof body.color === "string" ? body.color : undefined,
-    icon: typeof body.icon === "string" ? body.icon : undefined,
+    description: optionalString(body.description) ?? "",
+    color: optionalString(body.color),
+    icon: optionalString(body.icon),
   });
 
   return c.json({ type }, 201);
 });
 
+// Publishes a snapshot by setting public metadata and public artifact visibility.
 roadmapRoutes.post("/roadmaps/:id/publish", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const roadmap = await getOwnedRoadmap(c, user);
   if (!roadmap) {
-    return notFound(c);
+    return notFound();
   }
 
   const body = await readJson(c.req.raw);
   const publicTitle = cleanText(body.publicTitle, roadmap.title, 120);
   const publicSummary = cleanText(body.publicSummary, roadmap.summary, 1000);
-  const slug = await createUniqueRoadmapSlug(c.env.DB, roadmap.id, cleanText(body.slug, publicTitle, 120));
-  const publicArtifactIds = Array.isArray(body.artifactIds)
-    ? body.artifactIds.filter((id): id is string => typeof id === "string")
-    : [];
+  const slugSource = optionalString(body.slug) ?? publicTitle;
+  const slug = await createUniqueRoadmapSlug(c.env.DB, roadmap.id, user.id, slugSource);
+  const publicArtifactIds = stringArray(body.artifactIds);
 
+  // Reset all artifact visibility first, then opt selected artifacts back in.
   const statements: D1PreparedStatement[] = [
     c.env.DB.prepare(
       `UPDATE roadmaps
@@ -246,9 +222,11 @@ roadmapRoutes.post("/roadmaps/:id/publish", async (c) => {
   return c.json({ roadmap: updated ? toPublicRoadmap(updated) : null });
 });
 
+// Slugs only need to be unique within one user's public roadmap namespace.
 async function createUniqueRoadmapSlug(
   db: D1Database,
   roadmapId: string,
+  userId: string,
   source: string,
 ): Promise<string> {
   const base = cleanHandle(source) || `roadmap-${roadmapId.slice(0, 8)}`;
@@ -256,8 +234,8 @@ async function createUniqueRoadmapSlug(
   for (let index = 0; index < 40; index += 1) {
     const slug = index === 0 ? base : `${base}-${index + 1}`;
     const existing = await db
-      .prepare("SELECT id FROM roadmaps WHERE slug = ? AND id != ?")
-      .bind(slug, roadmapId)
+      .prepare("SELECT id FROM roadmaps WHERE slug = ? AND user_id = ? AND id != ?")
+      .bind(slug, userId, roadmapId)
       .first<{ id: string }>();
 
     if (!existing) {

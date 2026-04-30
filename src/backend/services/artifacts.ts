@@ -1,8 +1,17 @@
-import { getArtifactForUser } from "../db/queries";
+import { getArtifactForUser } from "../db/artifacts";
+import { errorDetails, logError } from "../logger";
 import type { AppEnv, ArtifactRow, CurrentUser } from "../types";
 
+// Keep uploads bounded because Worker memory and downstream AI parsing are limited.
 const maxUploadSize = 10 * 1024 * 1024;
 type StoredFileArtifact = Pick<ArtifactRow, "id" | "r2_key">;
+type ArtifactFileDeletionContext = {
+  artifactId?: string;
+  roadmapId?: string;
+  userId: string;
+};
+
+// Only file types the app knows how to display or pass to the AI service are accepted.
 const allowedMimeTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -13,6 +22,7 @@ const allowedMimeTypes = new Set([
   "text/markdown",
 ]);
 
+// Returns a user-facing validation error, or null when the upload is acceptable.
 export function validateUploadFile(file: File): string | null {
   if (file.size > maxUploadSize) {
     return "Files must be 10MB or smaller.";
@@ -26,6 +36,7 @@ export function validateUploadFile(file: File): string | null {
   return null;
 }
 
+// Stores the bytes in R2 and the searchable/display metadata in D1.
 export async function createFileArtifact(
   env: AppEnv,
   user: CurrentUser,
@@ -41,6 +52,7 @@ export async function createFileArtifact(
   const safeName = sanitizeFileName(input.file.name || "upload");
   const key = `users/${user.id}/${artifactId}-${safeName}`;
 
+  // R2 owns the file body; D1 stores only a key pointing back to this object.
   await env.FILES.put(key, input.file.stream(), {
     httpMetadata: {
       contentType: mimeType,
@@ -70,19 +82,24 @@ export async function createFileArtifact(
   return getArtifactForUser(env.DB, artifactId, user.id);
 }
 
+// Deletes the D1 row first, then cleans up the external R2 object.
 export async function deleteArtifact(env: AppEnv, artifact: ArtifactRow) {
-  await deleteArtifactFile(env, artifact);
   await env.DB.prepare("DELETE FROM artifacts WHERE id = ? AND user_id = ?")
     .bind(artifact.id, artifact.user_id)
     .run();
+  await deleteArtifactFiles(env, artifact.r2_key ? [artifact.r2_key] : [], {
+    artifactId: artifact.id,
+    userId: artifact.user_id,
+  });
 }
 
-export async function deleteArtifactFilesForRoadmap(
-  env: AppEnv,
+// Roadmap deletion captures keys before D1 rows are removed.
+export async function listArtifactFileKeysForRoadmap(
+  db: D1Database,
   roadmapId: string,
   userId: string,
-) {
-  const artifacts = await env.DB.prepare(
+): Promise<string[]> {
+  const artifacts = await db.prepare(
     `SELECT id, r2_key
      FROM artifacts
      WHERE roadmap_id = ? AND user_id = ? AND r2_key IS NOT NULL`,
@@ -91,19 +108,42 @@ export async function deleteArtifactFilesForRoadmap(
     .all<StoredFileArtifact>();
 
   const artifactRows: StoredFileArtifact[] = artifacts.results ?? [];
-  await Promise.all(
-    artifactRows
-      .filter((artifact): artifact is StoredFileArtifact & { r2_key: string } => Boolean(artifact.r2_key))
-      .map((artifact) => env.FILES.delete(artifact.r2_key)),
-  );
+  return artifactRows.flatMap((artifact) => artifact.r2_key ? [artifact.r2_key] : []);
 }
 
-async function deleteArtifactFile(env: AppEnv, artifact: ArtifactRow) {
-  if (artifact.r2_key) {
-    await env.FILES.delete(artifact.r2_key);
+// R2 is outside the D1 transaction, so cleanup is best-effort and fully logged.
+export async function deleteArtifactFiles(
+  env: AppEnv,
+  r2Keys: string[],
+  context: ArtifactFileDeletionContext,
+) {
+  if (r2Keys.length === 0) {
+    return;
+  }
+
+  const results = await Promise.allSettled(r2Keys.map(async (r2Key) => env.FILES.delete(r2Key)));
+  const failures = results.flatMap((result, index) => {
+    if (result.status === "fulfilled") {
+      return [];
+    }
+
+    return [{
+      r2Key: r2Keys[index],
+      ...errorDetails(result.reason),
+    }];
+  });
+
+  if (failures.length > 0) {
+    logError("Failed to delete one or more artifact files from R2.", {
+      ...context,
+      attemptedCount: r2Keys.length,
+      failedCount: failures.length,
+      failures,
+    });
   }
 }
 
+// Browser-provided MIME types are preferred, with extension fallback for common text files.
 function normalizeMime(file: File): string {
   if (file.type) {
     if (file.type === "text/x-markdown") {
@@ -126,6 +166,7 @@ function normalizeMime(file: File): string {
   return "application/octet-stream";
 }
 
+// Prevents user-provided names from creating awkward or unsafe R2 object keys.
 function sanitizeFileName(value: string): string {
   const cleaned = value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   return cleaned || "upload";

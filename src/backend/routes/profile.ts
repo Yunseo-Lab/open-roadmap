@@ -3,37 +3,35 @@ import { createAuth } from "../auth";
 import {
   cleanHandle,
   cleanText,
+  conflict,
   readJson,
   requireUser,
-  unauthorized,
   type AppBindings,
 } from "../http";
 
 export const profileRoutes = new Hono<AppBindings>();
 
+// Better Auth owns its nested /auth/* handlers for sign-in, callback, and session APIs.
 profileRoutes.on(["GET", "POST"], "/auth/*", (c) => {
   return createAuth(c.env).handler(c.req.raw);
 });
 
+// Returns the normalized app user, including the profile row created in auth.ts.
 profileRoutes.get("/me", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return c.json({ error: "Authentication required." }, 401);
-  }
 
   return c.json({ user });
 });
 
 profileRoutes.patch("/profile", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const body = await readJson(c.req.raw);
   const displayName = cleanText(body.displayName, user.profile.displayName, 80);
   const bio = cleanText(body.bio, "", 240);
   const requestedHandle = cleanHandle(body.handle) || user.profile.handle;
+
+  // Handles are public URLs, so uniqueness is checked before updating the profile.
   const existing = await c.env.DB.prepare(
     "SELECT user_id FROM profiles WHERE handle = ? AND user_id != ?",
   )
@@ -41,7 +39,7 @@ profileRoutes.patch("/profile", async (c) => {
     .first<{ user_id: string }>();
 
   if (existing) {
-    return c.json({ error: "This handle is already in use." }, 409);
+    conflict("This handle is already in use.");
   }
 
   await c.env.DB.prepare(

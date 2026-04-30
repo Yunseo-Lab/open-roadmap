@@ -19,12 +19,11 @@ type ProfileRow = {
   bio: string;
 };
 
+// Builds the Better Auth instance for the current Worker request environment.
 export function createAuth(env: AppEnv) {
-  const googleClientId = env.GOOGLE_CLIENT_ID;
-  const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
-  const secret =
-    env.BETTER_AUTH_SECRET ??
-    (env.APP_ENV === "production" ? "" : "development-only-open-roadmap-secret-change-me");
+  const googleClientId = env.GOOGLE_CLIENT_ID?.trim();
+  const googleClientSecret = env.GOOGLE_CLIENT_SECRET?.trim();
+  const secret = resolveAuthSecret(env);
 
   return betterAuth({
     appName: "Open Roadmap",
@@ -64,6 +63,23 @@ export function createAuth(env: AppEnv) {
   });
 }
 
+// Production must provide a real secret; local development keeps a stable fallback
+// so auth sessions continue to work while running the app locally.
+function resolveAuthSecret(env: AppEnv): string {
+  const secret = env.BETTER_AUTH_SECRET?.trim();
+  if (secret) {
+    return secret;
+  }
+
+  if (env.APP_ENV === "production") {
+    throw new Error("BETTER_AUTH_SECRET is required in production.");
+  }
+
+  return "development-only-open-roadmap-secret-change-me";
+}
+
+// Reads the Better Auth session and returns the app-level user shape.
+// In non-production, it falls back to a local developer user for faster setup.
 export async function getCurrentUser(env: AppEnv, request: Request): Promise<CurrentUser | null> {
   const session = await createAuth(env)
     .api.getSession({
@@ -88,18 +104,7 @@ export async function getCurrentUser(env: AppEnv, request: Request): Promise<Cur
   return null;
 }
 
-export async function requireCurrentUser(env: AppEnv, request: Request): Promise<CurrentUser> {
-  const user = await getCurrentUser(env, request);
-  if (!user) {
-    throw new Response(JSON.stringify({ error: "Authentication required." }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  return user;
-}
-
+// Seeds a predictable local user so protected routes can be used without OAuth.
 async function ensureDevUser(db: D1Database): Promise<CurrentUser> {
   const now = Date.now();
   await db
@@ -118,6 +123,7 @@ async function ensureDevUser(db: D1Database): Promise<CurrentUser> {
   });
 }
 
+// Every authenticated user should also have a profile row used by public pages.
 async function ensureUserProfile(
   db: D1Database,
   user: Omit<CurrentUser, "profile">,
@@ -158,6 +164,7 @@ async function ensureUserProfile(
   };
 }
 
+// Starts from a readable slug and appends a suffix only when there is a collision.
 async function createUniqueHandle(db: D1Database, source: string): Promise<string> {
   const base = slugify(source).slice(0, 24) || "user";
 
@@ -176,6 +183,7 @@ async function createUniqueHandle(db: D1Database, source: string): Promise<strin
   return `${base}-${crypto.randomUUID().slice(0, 6)}`;
 }
 
+// Normalizes display names and user input into URL-safe handles.
 export function slugify(value: string): string {
   return value
     .toLowerCase()

@@ -1,9 +1,12 @@
-import { getGraph, listArtifacts, replaceGraph, toPublicArtifact } from "../db/queries";
+import { listArtifacts } from "../db/artifacts";
+import { getGraph, replaceGraph } from "../db/graphs";
+import { toPublicArtifact } from "../db/public-mappers";
 import { normalizeGraph } from "../../shared/graph";
-import type { AgentInput, AgentOperation, AgentResult } from "./local-agent";
+import { readResponsePreview } from "./response-preview";
+import type { AgentInput, AgentOperation, AgentResult } from "./types";
 import type { RoadmapGraph } from "../types";
 
-type PythonAgentResponse = {
+type RemoteAgentResponse = {
   graph?: unknown;
   summary?: unknown;
   operations?: unknown;
@@ -16,7 +19,7 @@ type PythonAgentResponse = {
   approvalRequest?: unknown;
 };
 
-type PythonErrorResponse = {
+type RemoteErrorResponse = {
   detail?: unknown;
   error?: unknown;
 };
@@ -31,19 +34,20 @@ export type AgentStreamEvent =
       operation: AgentOperation;
     };
 
-type PythonRequestContext = {
+type RemoteAgentRequestContext = {
   serviceUrl: string;
   currentGraph: RoadmapGraph;
   body: Record<string, unknown>;
 };
 
-export class PythonAgentServiceError extends Error {
+// Carries upstream service status codes back to API routes without losing context.
+class RemoteAgentServiceError extends Error {
   statusCode: number;
   code?: string;
 
   constructor(message: string, statusCode: number, code?: string) {
     super(message);
-    this.name = "PythonAgentServiceError";
+    this.name = "RemoteAgentServiceError";
     this.statusCode = statusCode;
     this.code = code;
   }
@@ -58,61 +62,65 @@ const responseTypes = new Set([
   "error",
 ]);
 
-export async function runPythonRoadmapAgent(input: AgentInput): Promise<AgentResult> {
-  const request = await buildPythonRequest(input);
+// Calls the remote agent service and normalizes its response into the shared AgentResult shape.
+export async function runRemoteRoadmapAgent(input: AgentInput): Promise<AgentResult> {
+  const request = await buildRemoteAgentRequest(input);
   const response = await fetch(`${request.serviceUrl}/roadmap-agent/runs`, {
     method: "POST",
-    headers: pythonServiceHeaders(input, false),
+    headers: remoteAgentHeaders(input, false),
     body: JSON.stringify(request.body),
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    const parsedError = parsePythonError(errorBody);
-    throw new PythonAgentServiceError(
-      `Python AI service failed: ${parsedError.message}`,
+    const errorBody = await readResponsePreview(response);
+    const parsedError = parseRemoteAgentError(errorBody);
+    throw new RemoteAgentServiceError(
+      `Remote AI service failed: ${parsedError.message}`,
       response.status,
       parsedError.code,
     );
   }
 
-  const payload = (await response.json()) as PythonAgentResponse;
-  return resultFromPythonPayload(input, request.currentGraph, payload);
+  const payload = (await response.json()) as RemoteAgentResponse;
+  return resultFromRemotePayload(input, request.currentGraph, payload);
 }
 
-export async function streamPythonRoadmapAgent(
+// Streams status/operation events from the remote agent service and waits for a final payload.
+export async function streamRemoteRoadmapAgent(
   input: AgentInput,
   emit: (event: AgentStreamEvent) => void | Promise<void>,
 ): Promise<AgentResult> {
-  const request = await buildPythonRequest(input);
+  const request = await buildRemoteAgentRequest(input);
   const response = await fetch(`${request.serviceUrl}/roadmap-agent/runs/stream`, {
     method: "POST",
-    headers: pythonServiceHeaders(input, true),
+    headers: remoteAgentHeaders(input, true),
     body: JSON.stringify(request.body),
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    const parsedError = parsePythonError(errorBody);
-    throw new PythonAgentServiceError(
-      `Python AI service failed: ${parsedError.message}`,
+    const errorBody = await readResponsePreview(response);
+    const parsedError = parseRemoteAgentError(errorBody);
+    throw new RemoteAgentServiceError(
+      `Remote AI service failed: ${parsedError.message}`,
       response.status,
       parsedError.code,
     );
   }
   if (!response.body) {
-    throw new PythonAgentServiceError("Python AI service did not return a stream.", 502, "stream_missing");
+    throw new RemoteAgentServiceError("Remote AI service did not return a stream.", 502, "stream_missing");
   }
 
-  let finalPayload: PythonAgentResponse | null = null;
+  let finalPayload: RemoteAgentResponse | null = null;
   let streamError: { message: string; statusCode: number; code?: string } | null = null;
   const decoder = new TextDecoder();
   const reader = response.body.getReader();
   let buffer = "";
 
+  // SSE chunks may split events, so keep a buffer between reads.
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
+      buffer += decoder.decode();
       break;
     }
 
@@ -135,11 +143,11 @@ export async function streamPythonRoadmapAgent(
         }
       }
       if (event.event === "final") {
-        finalPayload = data as PythonAgentResponse;
+        finalPayload = data as RemoteAgentResponse;
       }
       if (event.event === "error") {
         streamError = {
-          message: stringField(data, "message") || "Python AI service stream failed.",
+          message: stringField(data, "message") || "Remote AI service stream failed.",
           statusCode: numberField(data, "statusCode") || 500,
           code: stringField(data, "code") || undefined,
         };
@@ -152,11 +160,11 @@ export async function streamPythonRoadmapAgent(
     if (event) {
       const data = parseSseData(event.data);
       if (event.event === "final") {
-        finalPayload = data as PythonAgentResponse;
+        finalPayload = data as RemoteAgentResponse;
       }
       if (event.event === "error") {
         streamError = {
-          message: stringField(data, "message") || "Python AI service stream failed.",
+          message: stringField(data, "message") || "Remote AI service stream failed.",
           statusCode: numberField(data, "statusCode") || 500,
           code: stringField(data, "code") || undefined,
         };
@@ -165,20 +173,21 @@ export async function streamPythonRoadmapAgent(
   }
 
   if (streamError) {
-    throw new PythonAgentServiceError(
-      `Python AI service failed: ${streamError.message}`,
+    throw new RemoteAgentServiceError(
+      `Remote AI service failed: ${streamError.message}`,
       streamError.statusCode,
       streamError.code,
     );
   }
   if (!finalPayload) {
-    throw new PythonAgentServiceError("Python AI service stream ended without a final result.", 502, "final_missing");
+    throw new RemoteAgentServiceError("Remote AI service stream ended without a final result.", 502, "final_missing");
   }
 
-  return resultFromPythonPayload(input, request.currentGraph, finalPayload);
+  return resultFromRemotePayload(input, request.currentGraph, finalPayload);
 }
 
-async function buildPythonRequest(input: AgentInput): Promise<PythonRequestContext> {
+// Builds the request body from the current graph and selected artifacts only.
+async function buildRemoteAgentRequest(input: AgentInput): Promise<RemoteAgentRequestContext> {
   const currentGraph = await getGraph(input.db, input.roadmapId);
   const artifacts = await listArtifacts(input.db, input.userId, input.roadmapId);
   const selectedArtifactIds = new Set(input.artifactIds);
@@ -203,10 +212,11 @@ async function buildPythonRequest(input: AgentInput): Promise<PythonRequestConte
   };
 }
 
-async function resultFromPythonPayload(
+// Saves committed graph updates; answer-only responses keep the current graph unchanged.
+async function resultFromRemotePayload(
   input: AgentInput,
   currentGraph: RoadmapGraph,
-  payload: PythonAgentResponse,
+  payload: RemoteAgentResponse,
 ): Promise<AgentResult> {
   const committed = normalizeCommitted(payload.committed);
   const savedGraph = committed
@@ -224,7 +234,7 @@ async function resultFromPythonPayload(
     graph: savedGraph,
     summary: typeof payload.summary === "string" ? payload.summary : "AI service updated the roadmap.",
     operations: normalizeOperations(payload.operations),
-    model: typeof payload.model === "string" ? payload.model : "python-ai-service",
+    model: typeof payload.model === "string" ? payload.model : "remote-ai-service",
     responseType: normalizeResponseType(payload.responseType),
     committed,
     citations: normalizeRecordArray(payload.citations),
@@ -234,6 +244,7 @@ async function resultFromPythonPayload(
   };
 }
 
+// Pulls complete SSE blocks out of a streaming text buffer.
 function popSseEvents(buffer: string): { messages: Array<{ event: string; data: string }>; remaining: string } {
   const messages: Array<{ event: string; data: string }> = [];
   let remaining = buffer;
@@ -253,6 +264,7 @@ function popSseEvents(buffer: string): { messages: Array<{ event: string; data: 
   }
 }
 
+// Parses the small subset of SSE syntax emitted by the remote service.
 function parseSseBlock(block: string): { event: string; data: string } | null {
   let event = "message";
   const data: string[] = [];
@@ -273,6 +285,7 @@ function parseSseBlock(block: string): { event: string; data: string } | null {
   return { event, data: data.join("\n") };
 }
 
+// Bad event JSON is ignored so one malformed progress event does not kill the run.
 function parseSseData(data: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(data) as unknown;
@@ -285,6 +298,7 @@ function parseSseData(data: string): Record<string, unknown> {
   return {};
 }
 
+// Normalizes operation events before forwarding them to the frontend stream.
 function normalizeOperation(value: unknown): AgentOperation | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -306,7 +320,8 @@ function normalizeOperation(value: unknown): AgentOperation | null {
   };
 }
 
-function pythonServiceHeaders(input: AgentInput, acceptsStream: boolean): Record<string, string> {
+// Adds optional bearer auth when the remote service token is configured.
+function remoteAgentHeaders(input: AgentInput, acceptsStream: boolean): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -322,6 +337,7 @@ function pythonServiceHeaders(input: AgentInput, acceptsStream: boolean): Record
   return headers;
 }
 
+// Tiny field readers keep response normalization explicit and type-safe.
 function stringField(value: Record<string, unknown>, key: string): string {
   const field = value[key];
   return typeof field === "string" ? field.trim() : "";
@@ -336,9 +352,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function parsePythonError(body: string): { message: string; code?: string } {
+// Supports both FastAPI-style detail objects and simpler error payloads.
+function parseRemoteAgentError(body: string): { message: string; code?: string } {
   try {
-    const payload = JSON.parse(body) as PythonErrorResponse;
+    const payload = JSON.parse(body) as RemoteErrorResponse;
     const detail = payload.detail;
     if (detail && typeof detail === "object" && !Array.isArray(detail)) {
       const error = (detail as { error?: unknown }).error;
@@ -374,9 +391,10 @@ function parsePythonError(body: string): { message: string; code?: string } {
   }
 
   const fallback = body.trim().slice(0, 300);
-  return { message: fallback || "Unknown Python AI service error." };
+  return { message: fallback || "Unknown remote AI service error." };
 }
 
+// The service may include extra fields; only operation-shaped records are retained.
 function normalizeOperations(value: unknown): AgentOperation[] {
   if (!Array.isArray(value)) {
     return [];
@@ -392,6 +410,7 @@ function normalizeOperations(value: unknown): AgentOperation[] {
   });
 }
 
+// Response metadata is optional, so invalid values are dropped rather than surfaced.
 function normalizeResponseType(value: unknown): AgentResult["responseType"] {
   return typeof value === "string" && responseTypes.has(value) ? (value as AgentResult["responseType"]) : undefined;
 }

@@ -1,18 +1,62 @@
 import type { Context } from "hono";
 import { getCurrentUser, slugify } from "./auth";
-import { getArtifactForUser, getRoadmapForUser } from "./db/queries";
+import { getArtifactForUser } from "./db/artifacts";
+import { getRoadmapForUser } from "./db/roadmaps";
 import type { AppEnv, CurrentUser, JsonRecord } from "./types";
 
+// Hono receives the Cloudflare Worker bindings through this typed context.
 export type AppBindings = {
   Bindings: AppEnv;
 };
 
 export type AppContext = Context<AppBindings>;
 
-export async function requireUser(c: AppContext): Promise<CurrentUser | null> {
+type HttpErrorStatus = 400 | 401 | 404 | 409;
+
+// Route helpers throw this for expected client errors; the app-level error
+// handler converts it back into a JSON response without logging it as a 500.
+export class HttpError extends Error {
+  readonly status: HttpErrorStatus;
+
+  constructor(status: HttpErrorStatus, message: string) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
+
+export function badRequest(message: string): never {
+  throw new HttpError(400, message);
+}
+
+export function conflict(message: string): never {
+  throw new HttpError(409, message);
+}
+
+export function unauthorized(message = "Authentication required."): never {
+  throw new HttpError(401, message);
+}
+
+export function notFound(message = "Not found."): never {
+  throw new HttpError(404, message);
+}
+
+// Use this for endpoints that can work for both signed-in and public visitors.
+export async function getOptionalUser(c: AppContext): Promise<CurrentUser | null> {
   return getCurrentUser(c.env, c.req.raw);
 }
 
+// Use this for protected endpoints. Authentication failure is handled centrally.
+export async function requireUser(c: AppContext): Promise<CurrentUser> {
+  const user = await getOptionalUser(c);
+  if (!user) {
+    unauthorized();
+  }
+
+  return user;
+}
+
+// Loads a roadmap only when the route id belongs to the current user.
 export async function getOwnedRoadmap(c: AppContext, user: CurrentUser) {
   const id = c.req.param("id");
   if (!id) {
@@ -22,6 +66,7 @@ export async function getOwnedRoadmap(c: AppContext, user: CurrentUser) {
   return getRoadmapForUser(c.env.DB, id, user.id);
 }
 
+// Loads an artifact only when the route id belongs to the current user.
 export async function getOwnedArtifact(c: AppContext, user: CurrentUser) {
   const id = c.req.param("id");
   if (!id) {
@@ -31,6 +76,7 @@ export async function getOwnedArtifact(c: AppContext, user: CurrentUser) {
   return getArtifactForUser(c.env.DB, id, user.id);
 }
 
+// Guards node attachment so artifacts cannot be linked across roadmaps.
 export async function nodeBelongsToRoadmap(db: D1Database, nodeId: string, roadmapId: string) {
   const node = await db
     .prepare("SELECT id FROM roadmap_nodes WHERE id = ? AND roadmap_id = ?")
@@ -40,27 +86,28 @@ export async function nodeBelongsToRoadmap(db: D1Database, nodeId: string, roadm
   return Boolean(node);
 }
 
+// Parses optional JSON bodies, but rejects malformed or non-object JSON clearly.
 export async function readJson(request: Request): Promise<JsonRecord> {
-  try {
-    const parsed: unknown = await request.json();
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as JsonRecord;
-    }
-  } catch {
+  const body = await request.text();
+  if (!body.trim()) {
     return {};
   }
 
-  return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    badRequest("Request body must be valid JSON.");
+  }
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    return parsed as JsonRecord;
+  }
+
+  badRequest("Request body must be a JSON object.");
 }
 
-export function unauthorized(c: AppContext) {
-  return c.json({ error: "Authentication required." }, 401);
-}
-
-export function notFound(c: AppContext) {
-  return c.json({ error: "Not found." }, 404);
-}
-
+// Cleans short user-facing text fields while preserving a caller-provided fallback.
 export function cleanText(value: unknown, fallback: string, maxLength: number): string {
   if (typeof value !== "string") {
     return fallback;
@@ -70,6 +117,36 @@ export function cleanText(value: unknown, fallback: string, maxLength: number): 
   return (trimmed || fallback).slice(0, maxLength);
 }
 
+export function requiredCleanText(value: unknown, message: string, maxLength: number): string {
+  const cleaned = cleanText(value, "", maxLength);
+  if (!cleaned) {
+    badRequest(message);
+  }
+
+  return cleaned;
+}
+
+export function optionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+export function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+// Handles are stricter than general text because they appear in public URLs.
 export function cleanHandle(value: unknown): string {
   if (typeof value !== "string") {
     return "";
@@ -78,11 +155,7 @@ export function cleanHandle(value: unknown): string {
   return slugify(value).slice(0, 48);
 }
 
+// FormData can include File values; this helper accepts only non-empty text.
 export function optionalFormText(value: FormDataEntryValue | null): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed || null;
+  return optionalString(value) ?? null;
 }

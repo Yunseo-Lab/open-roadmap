@@ -1,51 +1,55 @@
 import { Hono } from "hono";
-import { getArtifactForUser, getPublicArtifact, getRoadmapForUser, toPublicArtifact } from "../db/queries";
+import { getArtifactForUser, getPublicArtifact } from "../db/artifacts";
+import { toPublicArtifact } from "../db/public-mappers";
+import { getRoadmapForUser } from "../db/roadmaps";
 import {
+  badRequest,
   cleanText,
+  getOptionalUser,
   getOwnedArtifact,
   nodeBelongsToRoadmap,
   notFound,
+  optionalString,
   optionalFormText,
   readJson,
   requireUser,
-  unauthorized,
   type AppBindings,
 } from "../http";
 import { createFileArtifact, deleteArtifact, validateUploadFile } from "../services/artifacts";
 
 export const artifactRoutes = new Hono<AppBindings>();
 
+// Handles multipart uploads and optionally attaches the file to a roadmap node.
 artifactRoutes.post("/uploads", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const form = await c.req.raw.formData();
   const file = form.get("file");
   if (!(file instanceof File)) {
-    return c.json({ error: "The file field is required." }, 400);
+    badRequest("The file field is required.");
   }
 
   const validationError = validateUploadFile(file);
   if (validationError) {
-    return c.json({ error: validationError }, 400);
+    badRequest(validationError);
   }
 
   const roadmapId = optionalFormText(form.get("roadmapId"));
   const nodeId = optionalFormText(form.get("nodeId"));
+
+  // Roadmap and node ids are cross-checked so users cannot attach across ownership boundaries.
   if (roadmapId) {
     const roadmap = await getRoadmapForUser(c.env.DB, roadmapId, user.id);
     if (!roadmap) {
-      return c.json({ error: "Roadmap not found." }, 404);
+      notFound("Roadmap not found.");
     }
   }
   if (nodeId) {
     if (!roadmapId) {
-      return c.json({ error: "Roadmap is required when attaching to a node." }, 400);
+      badRequest("Roadmap is required when attaching to a node.");
     }
     if (!(await nodeBelongsToRoadmap(c.env.DB, nodeId, roadmapId))) {
-      return c.json({ error: "Node not found for this roadmap." }, 404);
+      notFound("Node not found for this roadmap.");
     }
   }
 
@@ -59,34 +63,30 @@ artifactRoutes.post("/uploads", async (c) => {
   return c.json({ artifact: artifact ? toPublicArtifact(artifact) : null }, 201);
 });
 
+// Moves an existing artifact between nodes, or detaches it when nodeId is null.
 artifactRoutes.patch("/artifacts/:id", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const artifact = await getOwnedArtifact(c, user);
   if (!artifact) {
-    return notFound(c);
+    return notFound();
   }
 
   const body = await readJson(c.req.raw);
   const nodeId = body.nodeId === null
     ? null
-    : typeof body.nodeId === "string"
-      ? cleanText(body.nodeId, "", 80)
-      : undefined;
+    : optionalString(body.nodeId);
 
-  if (nodeId === undefined || nodeId === "") {
-    return c.json({ error: "Node is required, or pass null to detach." }, 400);
+  if (nodeId === undefined) {
+    badRequest("Node is required, or pass null to detach.");
   }
 
   if (nodeId) {
     if (!artifact.roadmap_id) {
-      return c.json({ error: "Artifact must belong to a roadmap before it can be attached." }, 400);
+      badRequest("Artifact must belong to a roadmap before it can be attached.");
     }
     if (!(await nodeBelongsToRoadmap(c.env.DB, nodeId, artifact.roadmap_id))) {
-      return c.json({ error: "Node not found for this roadmap." }, 404);
+      notFound("Node not found for this roadmap.");
     }
   }
 
@@ -104,34 +104,32 @@ artifactRoutes.patch("/artifacts/:id", async (c) => {
 
 artifactRoutes.delete("/artifacts/:id", async (c) => {
   const user = await requireUser(c);
-  if (!user) {
-    return unauthorized(c);
-  }
 
   const artifact = await getOwnedArtifact(c, user);
   if (!artifact) {
-    return notFound(c);
+    return notFound();
   }
 
   await deleteArtifact(c.env, artifact);
   return c.json({ ok: true });
 });
 
+// File downloads are private by owner first, then public only when explicitly published.
 artifactRoutes.get("/artifacts/:id/file", async (c) => {
   const artifactId = c.req.param("id");
-  const user = await requireUser(c);
+  const user = await getOptionalUser(c);
   const privateArtifact = user
     ? await getArtifactForUser(c.env.DB, artifactId, user.id)
     : null;
   const artifact = privateArtifact ?? (await getPublicArtifact(c.env.DB, artifactId));
 
   if (!artifact?.r2_key) {
-    return notFound(c);
+    return notFound();
   }
 
   const object = await c.env.FILES.get(artifact.r2_key);
   if (!object) {
-    return notFound(c);
+    return notFound();
   }
 
   const headers = new Headers();

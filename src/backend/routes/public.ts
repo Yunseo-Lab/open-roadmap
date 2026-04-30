@@ -1,44 +1,29 @@
 import { Hono } from "hono";
-import { getGraph, toPublicArtifact, toPublicRoadmap } from "../db/queries";
+import { getGraph } from "../db/graphs";
+import {
+  getPublishedRoadmapForHandle,
+  getPublicProfileByHandle,
+  listPublicArtifactsForRoadmap,
+  listPublicRoadmapsForHandle,
+} from "../db/public";
+import { toPublicArtifact, toPublicRoadmap } from "../db/public-mappers";
 import { cleanHandle, notFound, type AppBindings } from "../http";
-import type { ArtifactRow, RoadmapRow } from "../types";
 
 export const publicRoutes = new Hono<AppBindings>();
 
+// Public profile pages expose only the profile fields and published roadmaps.
 publicRoutes.get("/public/users/:handle", async (c) => {
   const handle = cleanHandle(c.req.param("handle"));
   if (!handle) {
-    return notFound(c);
+    return notFound();
   }
 
-  const profile = await c.env.DB.prepare(
-    `SELECT profiles.handle, profiles.display_name, profiles.bio, users.image
-     FROM profiles
-     JOIN users ON users.id = profiles.user_id
-     WHERE profiles.handle = ?`,
-  )
-    .bind(handle)
-    .first<{ handle: string; display_name: string; bio: string; image: string | null }>();
-
+  const profile = await getPublicProfileByHandle(c.env.DB, handle);
   if (!profile) {
-    return notFound(c);
+    return notFound();
   }
 
-  const roadmaps = await c.env.DB.prepare(
-    `SELECT
-       roadmaps.*,
-       (
-         SELECT COUNT(*)
-         FROM roadmap_nodes
-         WHERE roadmap_nodes.roadmap_id = roadmaps.id
-       ) AS node_count
-     FROM roadmaps
-     WHERE roadmaps.user_id = (SELECT user_id FROM profiles WHERE handle = ?)
-       AND roadmaps.status = 'published'
-     ORDER BY roadmaps.published_at DESC`,
-  )
-    .bind(handle)
-    .all<RoadmapRow>();
+  const roadmaps = await listPublicRoadmapsForHandle(c.env.DB, handle);
 
   return c.json({
     profile: {
@@ -47,57 +32,37 @@ publicRoutes.get("/public/users/:handle", async (c) => {
       bio: profile.bio,
       image: profile.image,
     },
-    roadmaps: (roadmaps.results ?? []).map(toPublicRoadmap),
+    roadmaps: roadmaps.map(toPublicRoadmap),
   });
 });
 
-publicRoutes.get("/public/roadmaps/:slug", async (c) => {
+// Public roadmap pages expose the published graph plus artifacts explicitly marked public.
+publicRoutes.get("/public/users/:handle/roadmaps/:slug", async (c) => {
+  const handle = cleanHandle(c.req.param("handle"));
   const slug = cleanHandle(c.req.param("slug"));
-  if (!slug) {
-    return notFound(c);
+  if (!handle || !slug) {
+    return notFound();
   }
 
-  const roadmap = await c.env.DB.prepare(
-    `SELECT roadmaps.*
-     FROM roadmaps
-     WHERE slug = ? AND status = 'published'`,
-  )
-    .bind(slug)
-    .first<RoadmapRow>();
-
-  if (!roadmap) {
-    return notFound(c);
+  const [profile, roadmap] = await Promise.all([
+    getPublicProfileByHandle(c.env.DB, handle),
+    getPublishedRoadmapForHandle(c.env.DB, handle, slug),
+  ]);
+  if (!profile || !roadmap) {
+    return notFound();
   }
 
-  const profile = await c.env.DB.prepare(
-    `SELECT profiles.handle, profiles.display_name, profiles.bio, users.image
-     FROM profiles
-     JOIN users ON users.id = profiles.user_id
-     WHERE profiles.user_id = ?`,
-  )
-    .bind(roadmap.user_id)
-    .first<{ handle: string; display_name: string; bio: string; image: string | null }>();
-
-  const artifacts = await c.env.DB.prepare(
-    `SELECT *
-     FROM artifacts
-     WHERE roadmap_id = ? AND is_public = 1
-     ORDER BY created_at DESC`,
-  )
-    .bind(roadmap.id)
-    .all<ArtifactRow>();
+  const artifacts = await listPublicArtifactsForRoadmap(c.env.DB, roadmap.id);
 
   return c.json({
-    profile: profile
-      ? {
-          handle: profile.handle,
-          displayName: profile.display_name,
-          bio: profile.bio,
-          image: profile.image,
-        }
-      : null,
+    profile: {
+      handle: profile.handle,
+      displayName: profile.display_name,
+      bio: profile.bio,
+      image: profile.image,
+    },
     roadmap: toPublicRoadmap(roadmap),
     graph: await getGraph(c.env.DB, roadmap.id),
-    artifacts: (artifacts.results ?? []).map(toPublicArtifact),
+    artifacts: artifacts.map(toPublicArtifact),
   });
 });
