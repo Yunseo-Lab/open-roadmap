@@ -1,6 +1,20 @@
 # Open Roadmap
 
+An AI-assisted roadmap editor that connects goals, progress, and evidence.
+
 AI와 함께 로드맵을 만들고, 목표와 이벤트의 증거를 공개 포트폴리오로 발행하는 Cloudflare Workers 기반 v1입니다.
+
+## What it does
+
+- AI와 대화하며 목표와 활동을 로드맵으로 구성합니다.
+- React Flow 기반 그래프 편집 화면에서 목표와 이벤트의 관계를 정리합니다.
+- 활동의 근거 자료를 연결하고 공개 로드맵과 프로필로 공유합니다.
+
+## Architecture
+
+`React / React Flow` → `Hono / Cloudflare Workers` → `D1 / R2`
+
+AI 요청은 환경 설정에 따라 Python AI 서비스 또는 Worker 내 에이전트로 전달됩니다.
 
 ## Structure
 
