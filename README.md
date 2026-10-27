@@ -77,3 +77,7 @@ npx wrangler secret put AI_SERVICE_TOKEN
 `AI_SERVICE_TOKEN`에는 AI service의 `.env`에 있는 같은 값을 넣습니다.
 
 로컬 개발에서는 `APP_ENV=development`일 때 Google OAuth가 없어도 개발용 사용자로 API를 사용할 수 있습니다.
+
+## 공개 주소
+
+https://open-roadmap.yunseo-lab.com — Cloudflare Worker `open-roadmap`의 Custom Domain입니다. 인증 기본 주소도 같은 도메인으로 설정합니다.
